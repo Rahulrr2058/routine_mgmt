@@ -1,0 +1,65 @@
+@import url('https://fonts.googleapis.com/css2?family=Lexend:wght@100..900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+
+:root {
+    --background: #ffffff;
+    --foreground: #171717;
+}
+
+.bg-icon{
+    background: radial-gradient(67.5% 67.5% at 20% 20%, #FCCD67 5.5%, #D85338 92%) /* warning: gradient uses a rotation that is not supported by CSS and may not behave as expected */;
+
+}
+.face-position {
+
+    background: transparent;
+    /*border: 2px solid #D9583E;*/
+    border: 2px solid white;
+    border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --background: #0a0a0a;
+        --foreground: #ededed;
+
+    }
+}
+
+
+body {
+    color: var(--foreground);
+    background: var(--background);
+    font-family: Lexend, Arial, Helvetica, sans-serif;
+}
+.front-image{
+    border-radius: 50%;
+}
+
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: white;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #FCCD67;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #FCC377;
+}
+
+.prose ol {
+    list-style-type: decimal;
+    margin-left: 20px;
+}
+.prose ul {
+    list-style-type: disc;
+    margin-left: 20px;
+}
