@@ -51,6 +51,9 @@ export default function FacultyPage() {
     const onSubmit = async (data: FacultyFormData) => {
        try {
            const res = await PostRequest("/faculty", data);
+           setAddOpened(false);
+           reset();
+           await getFaculties();
 
        }
        catch (e)

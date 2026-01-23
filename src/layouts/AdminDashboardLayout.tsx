@@ -22,7 +22,7 @@ import {
     IconBuildingCommunity,
     IconClock,
     IconLogout,
-    IconUserCircle,
+    IconUserCircle, IconClock2,
 } from "@tabler/icons-react";
 import { deleteCookie } from "cookies-next/client";
 
@@ -52,7 +52,8 @@ export function AdminDashboardLayout({
         { label: "Dashboard", href: "/dashboard", icon: IconDashboard },
         { label: "Batches", href: "/dashboard/batch", icon: IconSchool },
         { label: "Class Routine", href: "/dashboard/class-routine", icon: IconClock },
-        { label: "Class Section", href: "/dashboard/daily-routine", icon: IconBuildingCommunity },
+        { label: "Daily Routine", href: "/dashboard/daily-routine", icon: IconClock2 },
+        { label: "Class Section", href: "/dashboard/class-section", icon: IconBuildingCommunity },
         { label: "Faculty", href: "/dashboard/faculty", icon: IconBuildingCommunity },
         { label: "Semesters", href: "/dashboard/semester", icon: IconCalendarEvent },
     ];

@@ -1,136 +1,227 @@
+// src/pages/DailyClassPage.tsx
 import React, { useEffect, useState } from 'react';
-import { Table, Button, Group, ActionIcon, Text, Badge } from '@mantine/core';
-import { IconEdit, IconTrash, IconEye } from '@tabler/icons-react';
-import axios from 'axios';
-import {AdminDashboardLayout} from "@/layouts/AdminDashboardLayout";
-import ClassRoutinePage from "@/pages/dashboard/class-routine";
-import {DeleteRequest, GetRequest, PatchRequest} from "@/plugins/https";
+import {
+    MantineProvider,
+    createTheme,
+    Title,
+    Button,
+    Group,
+    Stack,
+    Paper,
+    Badge,
+    ActionIcon,
+    Text,
+    Table,
+    Loader,
+    Switch,
+    Alert,
+} from '@mantine/core';
+import { IconCheck, IconX, IconCalendarEvent } from '@tabler/icons-react';
+import { AdminDashboardLayout } from "@/layouts/AdminDashboardLayout";
+import { GetRequest, PatchRequest } from "@/plugins/https";
+import { format } from 'date-fns';
 
-interface ClassRoutine {
-    id: string;
-    day: string;
-    index: number;
-    startTime: string;
-    endTime: string;
-    subject: string;
-    teacher: string;
-    roomNo: string;
-}
+const theme = createTheme({ primaryColor: 'indigo' });
 
 interface DailyClass {
     id: string;
     classDate: string;
     hasAttended: boolean;
-    classRoutine: ClassRoutine;
+    classRoutine: {
+        id: string;
+        day: string;
+        index: number;
+        startTime: string;
+        endTime: string;
+        subject: string;
+        teacher: string;
+        roomNo?: string;
+        classSection: {
+            id: string;
+            name: string;
+            semester: {
+                id: string;
+                name: string;
+                batch: {
+                    id: string;
+                    name: string;
+                    year: string;
+                    faculty: {
+                        id: string;
+                        name: string;
+                    };
+                };
+            };
+        };
+    };
 }
 
-const DailyClassesTable = () => {
-    const [classes, setClasses] = useState<DailyClass[]>([]);
+export default function DailyClassPage() {
+    const [dailyClasses, setDailyClasses] = useState<DailyClass[]>([]);
     const [loading, setLoading] = useState(true);
+    const [updatingId, setUpdatingId] = useState<string | null>(null);
+    const [error, setError] = useState<string | null>(null);
 
-    const fetchClasses = async () => {
+    // Fetch today's classes
+    const fetchTodaysClasses = async () => {
         try {
-            const response = await GetRequest('/daily-class');
-            setClasses(response.data);
-            console.log(response)// Adjust based on your API response structure
-        } catch (error) {
-            console.error('Error fetching classes:', error);
+            setLoading(true);
+            setError(null);
+
+            const today = format(new Date(), 'yyyy-MM-dd');
+            const res = await GetRequest(`/daily-class/date/${today}`);
+
+            const data = res.data?.data || res.data || [];
+            setDailyClasses(data);
+        } catch (err: any) {
+            console.error("Failed to fetch today's classes", err);
+            setError(err.response?.data?.message || "Failed to load today's classes");
+            setDailyClasses([]);
         } finally {
             setLoading(false);
         }
     };
 
     useEffect(() => {
-        fetchClasses();
+        fetchTodaysClasses();
     }, []);
 
-    const handleMarkAttended = async (id: string) => {
+    const toggleAttendance = async (dailyClass: DailyClass) => {
         try {
-            await PatchRequest(`/daily-class/${id}`, { hasAttended: true });
-            setClasses(prev =>
-                prev.map(cls => (cls.id === id ? { ...cls, hasAttended: true } : cls))
+            setUpdatingId(dailyClass.id);
+            await PatchRequest(`/daily-class/${dailyClass.id}`, {
+                hasAttended: !dailyClass.hasAttended,
+            });
+
+            setDailyClasses(prev =>
+                prev.map(dc =>
+                    dc.id === dailyClass.id
+                        ? { ...dc, hasAttended: !dc.hasAttended }
+                        : dc
+                )
             );
-        } catch (error) {
-            console.error('Error marking attended:', error);
+        } catch (err: any) {
+            console.error("Failed to update attendance", err);
+            alert("Failed to update attendance");
+        } finally {
+            setUpdatingId(null);
         }
     };
 
-    const handleDelete = async (id: string) => {
-
-            try {
-                 await DeleteRequest(`/daily-class/${id}`);
-                setClasses(prev => prev.filter(cls => cls.id !== id));
-            } catch (error) {
-                console.error('Error deleting:', error);
-            }
-    };
-
-    const rows = classes?.map((item) => (
-        <Table.Tr key={item.id}>
-            <Table.Td>{item.classDate}</Table.Td>
-            <Table.Td>{item.classRoutine.subject}</Table.Td>
-            <Table.Td>{item.classRoutine.teacher}</Table.Td>
-            <Table.Td>{item.classRoutine.startTime} - {item.classRoutine.endTime}</Table.Td>
-            <Table.Td>{item.classRoutine.roomNo}</Table.Td>
-
-
-            <Table.Td>
-                <Badge color={item.hasAttended ? 'green' : 'red'}>
-                    {item.hasAttended ? 'Attended' : 'Not Attended'}
-                </Badge>
-            </Table.Td>
-            <Table.Td>
-                <Group gap="xs">
-                    {!item.hasAttended && (
-                        <Button
-                            size="xs"
-                            color="blue"
-                            onClick={() => handleMarkAttended(item.id)}
-                        >
-                            Mark Attended
-                        </Button>
-                    )}
-                    <ActionIcon
-                        size="sm"
-                        variant="subtle"
-                        color="gray"
-                        // You can implement view/details fetch from /daily-class/details/${item.id}
-                    >
-                        <IconEye size={16} />
-                    </ActionIcon>
-                    <ActionIcon
-                        size="sm"
-                        variant="subtle"
-                        color="red"
-                        onClick={() => handleDelete(item.id)}
-                    >
-                        <IconTrash size={16} />
-                    </ActionIcon>
-                </Group>
-            </Table.Td>
-        </Table.Tr>
-    ));
+    const todayFormatted = format(new Date(), 'EEEE, MMMM d, yyyy');
 
     return (
-        <Table striped highlightOnHover withTableBorder withColumnBorders>
-            <Table.Thead>
-                <Table.Tr>
-                    <Table.Th>Date</Table.Th>
-                    <Table.Th>Subject</Table.Th>
-                    <Table.Th>Teacher</Table.Th>
-                    <Table.Th>Time</Table.Th>
-                    <Table.Th>Room</Table.Th>
-                    <Table.Th>Attendance</Table.Th>
-                    <Table.Th>Actions</Table.Th>
-                </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>{loading ? <Table.Tr><Table.Td colSpan={7}>Loading...</Table.Td></Table.Tr> : rows}</Table.Tbody>
-        </Table>
+        <MantineProvider theme={theme} defaultColorScheme="light">
+            <div className="p-8 max-w-7xl mx-auto">
+                <Group justify="space-between" mb="xl">
+                    <Stack gap={4}>
+                        <Title order={1}>Today's Classes</Title>
+                        <Group gap="xs" align="center">
+                            <IconCalendarEvent size={20} />
+                            <Text size="lg" c="dimmed">{todayFormatted}</Text>
+                        </Group>
+                    </Stack>
+                    <Button
+                        onClick={fetchTodaysClasses}
+                        loading={loading}
+                        variant="light"
+                    >
+                        Refresh
+                    </Button>
+                </Group>
+
+                {error && (
+                    <Alert color="red" mb="lg">
+                        {error}
+                    </Alert>
+                )}
+
+                {loading ? (
+                    <Paper p="xl" withBorder ta="center">
+                        <Loader size="lg" />
+                        <Text mt="md">Loading today's classes...</Text>
+                    </Paper>
+                ) : dailyClasses.length === 0 ? (
+                    <Paper p="xl" withBorder>
+                        <Text c="dimmed" ta="center" size="lg">
+                            No classes scheduled for today.
+                        </Text>
+                    </Paper>
+                ) : (
+                    <Table withTableBorder withColumnBorders verticalSpacing="md">
+                        <Table.Thead>
+                            <Table.Tr>
+                                <Table.Th>Time</Table.Th>
+                                <Table.Th>Period</Table.Th>
+                                <Table.Th>Subject</Table.Th>
+                                <Table.Th>Teacher</Table.Th>
+                                <Table.Th>Room</Table.Th>
+                                <Table.Th>Class</Table.Th>
+                                <Table.Th ta="center">Attendance</Table.Th>
+                            </Table.Tr>
+                        </Table.Thead>
+                        <Table.Tbody>
+                            {dailyClasses.map((dc) => {
+                                const routine = dc.classRoutine;
+                                const section = routine.classSection;
+                                const semester = section?.semester;
+                                const batch = semester?.batch;
+                                const faculty = batch?.faculty;
+
+                                return (
+                                    <Table.Tr key={dc.id}>
+                                        <Table.Td fw={600}>
+                                            {routine.startTime} - {routine.endTime}
+                                        </Table.Td>
+                                        <Table.Td>{routine.index}</Table.Td>
+                                        <Table.Td fw={600} c="blue">
+                                            {routine.subject}
+                                        </Table.Td>
+                                        <Table.Td>{routine.teacher}</Table.Td>
+                                        <Table.Td>{routine.roomNo || '-'}</Table.Td>
+                                        <Table.Td>
+                                            <Stack gap={4}>
+                                                <Badge size="sm" color="violet" variant="light">
+                                                    {faculty?.name}
+                                                </Badge>
+                                                <Badge size="sm" color="blue" variant="light">
+                                                    {batch?.name.replace("'", "")} ({batch?.year})
+                                                </Badge>
+                                                <Badge size="sm" color="teal" variant="light">
+                                                    {semester?.name}
+                                                </Badge>
+                                                <Badge size="sm" color="orange">
+                                                    {section?.name}
+                                                </Badge>
+                                            </Stack>
+                                        </Table.Td>
+                                        <Table.Td ta="center">
+                                            <Switch
+                                                checked={dc.hasAttended}
+                                                onChange={() => toggleAttendance(dc)}
+                                                disabled={updatingId === dc.id}
+                                                color="teal"
+                                                size="md"
+                                                thumbIcon={
+                                                    dc.hasAttended ? (
+                                                        <IconCheck size={12} />
+                                                    ) : (
+                                                        <IconX size={12} />
+                                                    )
+                                                }
+                                            />
+                                        </Table.Td>
+                                    </Table.Tr>
+                                );
+                            })}
+                        </Table.Tbody>
+                    </Table>
+                )}
+            </div>
+        </MantineProvider>
     );
-};
+}
 
-export default DailyClassesTable;
-
-DailyClassesTable.getLayout = (page: any) => (
+DailyClassPage.getLayout = (page: any) => (
     <AdminDashboardLayout>{page}</AdminDashboardLayout>
 );

@@ -21,6 +21,8 @@
     "@mantine/notifications": "^7.14.3",
     "@next/third-parties": "^15.1.6",
     "@reduxjs/toolkit": "^2.7.0",
+    "@stripe/react-stripe-js": "^3.7.0",
+    "@stripe/stripe-js": "^1.54.2",
     "@tabler/icons-react": "^3.24.0",
     "@types/node": "^22.13.9",
     "@types/react": "^19.0.10",
@@ -28,6 +30,7 @@
     "axios": "^1.7.9",
     "browser-image-compression": "^2.0.0",
     "cookies-next": "^6.1.0",
+    "date-fns": "^4.1.0",
     "dayjs": "^1.11.13",
     "embla-carousel-autoplay": "^8.5.2",
     "embla-carousel-react": "^8.5.2",
@@ -45,9 +48,7 @@
     "react-redux": "^9.2.0",
     "react-router-dom": "^7.0.2",
     "suneditor": "^2.45.1",
-    "suneditor-react": "^3.6.1",
-    "@stripe/react-stripe-js": "^3.7.0",
-    "@stripe/stripe-js": "^1.54.2"
+    "suneditor-react": "^3.6.1"
   },
   "devDependencies": {
     "@types/js-cookie": "^3.0.6",

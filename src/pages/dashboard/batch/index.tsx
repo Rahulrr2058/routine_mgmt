@@ -102,13 +102,13 @@ export default function BatchesPage() {
         getFaculties();
     }, []);
 
-    const rows = batches.map((batch) => (
+    const rows = batches.map((batch:any) => (
         <Table.Tr key={batch.id}>
             <Table.Td>{batch.name}</Table.Td>
             <Table.Td>{batch.year}</Table.Td>
             <Table.Td>
                 <code className="text-xs bg-gray-100 px-2 py-1 rounded font-mono">
-                    {batch.facultyId}
+                    {batch.faculty.name}
                 </code>
             </Table.Td>
         </Table.Tr>
@@ -141,7 +141,7 @@ export default function BatchesPage() {
                             <Table.Tr>
                                 <Table.Th>Name</Table.Th>
                                 <Table.Th>Year</Table.Th>
-                                <Table.Th>Faculty ID</Table.Th>
+                                <Table.Th>Faculty </Table.Th>
                             </Table.Tr>
                         </Table.Thead>
                         <Table.Tbody>{rows}</Table.Tbody>

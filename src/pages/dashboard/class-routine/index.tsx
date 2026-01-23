@@ -15,7 +15,8 @@ import {
     Text,
     Grid,
     Table,
-    Loader, TextInput,
+    Loader,
+    TextInput,
 } from '@mantine/core';
 import { useForm, Controller } from 'react-hook-form';
 import { IconPlus, IconEdit } from '@tabler/icons-react';
@@ -25,6 +26,34 @@ import { GetRequest, PostRequest, PatchRequest } from "@/plugins/https";
 const theme = createTheme({ primaryColor: 'indigo' });
 
 const WEEK_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+interface Faculty {
+    id: string;
+    name: string;
+    isActive: boolean;
+}
+
+interface Batch {
+    id: string;
+    name: string;
+    year: string;
+    isActive: boolean;
+    faculty: Faculty;
+}
+
+interface Semester {
+    id: string;
+    name: string;
+    isActive: boolean;
+    isCurrent?: boolean;
+    batch: Batch;
+}
+
+interface Section {
+    id: string;
+    name: string;
+    semester: Semester;
+}
 
 interface ClassEntry {
     day: string;
@@ -36,33 +65,36 @@ interface ClassEntry {
     roomNo?: string;
 }
 
-interface Semester {
-    id: string;
-    name: string;
-    isActive: boolean;
-    batch?: {
-        id: string;
-        name: string;
-        year: string | number;
-    };
-}
-
 type FormData = {
+    facultyId: string;
+    batchId: string;
     semesterId: string;
+    sectionId: string;
     class: ClassEntry;
 };
 
 export default function ClassRoutinePage() {
     const [routines, setRoutines] = useState<any[]>([]);
+    const [faculties, setFaculties] = useState<Faculty[]>([]);
+    const [batches, setBatches] = useState<Batch[]>([]);
     const [semesters, setSemesters] = useState<Semester[]>([]);
-    const [loadingSemesters, setLoadingSemesters] = useState(true);
+    const [sections, setSections] = useState<Section[]>([]);
+
+    const [loadingFaculties, setLoadingFaculties] = useState(true);
+    const [loadingBatches, setLoadingBatches] = useState(false);
+    const [loadingSemesters, setLoadingSemesters] = useState(false);
+    const [loadingSections, setLoadingSections] = useState(false);
+
     const [modalOpened, setModalOpened] = useState(false);
     const [isEditMode, setIsEditMode] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
 
-    const { control, handleSubmit, reset } = useForm<FormData>({
+    const { control, handleSubmit, reset, watch, setValue } = useForm<FormData>({
         defaultValues: {
+            facultyId: '',
+            batchId: '',
             semesterId: '',
+            sectionId: '',
             class: {
                 day: 'Monday',
                 index: 1,
@@ -75,26 +107,52 @@ export default function ClassRoutinePage() {
         },
     });
 
-    const fetchRoutines = async () => {
+    const watchedFaculty = watch('facultyId');
+    const watchedBatch = watch('batchId');
+    const watchedSemester = watch('semesterId');
+
+    const fetchFaculties = async () => {
         try {
-            const res = await GetRequest("/class-routine");
+            setLoadingFaculties(true);
+            const res = await GetRequest("/faculty");
             const data = Array.isArray(res.data) ? res.data : res.data?.data || [];
-            setRoutines(data);
+            setFaculties(data.filter((f: Faculty) => f.isActive));
         } catch (error) {
-            console.error("Failed to fetch routines", error);
-            setRoutines([]);
+            console.error("Failed to fetch faculties", error);
+            setFaculties([]);
+        } finally {
+            setLoadingFaculties(false);
         }
     };
 
-    const fetchSemesters = async () => {
+    const fetchBatches = async (facultyId: string) => {
+        if (!facultyId) {
+            setBatches([]);
+            return;
+        }
+        try {
+            setLoadingBatches(true);
+            const res = await GetRequest(`/batch/faculties/${facultyId}`);
+            const data = Array.isArray(res.data) ? res.data : res.data?.data || [];
+            setBatches(data);
+        } catch (error) {
+            console.error("Failed to fetch batches", error);
+            setBatches([]);
+        } finally {
+            setLoadingBatches(false);
+        }
+    };
+
+    const fetchSemesters = async (batchId: string) => {
+        if (!batchId) {
+            setSemesters([]);
+            return;
+        }
         try {
             setLoadingSemesters(true);
-            const res = await GetRequest("/semester");
+            const res = await GetRequest(`/semester/batches/${batchId}`);
             const data = Array.isArray(res.data) ? res.data : res.data?.data || [];
-
-            // Optional: filter only active semesters
-            const activeSemesters = data.filter((s: Semester) => s.isActive);
-            setSemesters(activeSemesters.length > 0 ? activeSemesters : data);
+            setSemesters(data);
         } catch (error) {
             console.error("Failed to fetch semesters", error);
             setSemesters([]);
@@ -103,14 +161,66 @@ export default function ClassRoutinePage() {
         }
     };
 
+    const fetchSections = async (semesterId: string) => {
+        if (!semesterId) {
+            setSections([]);
+            return;
+        }
+        try {
+            setLoadingSections(true);
+            const res = await GetRequest(`/class-sections/semester/${semesterId}`);
+            const data = Array.isArray(res.data) ? res.data : res.data?.data || [];
+            setSections(data);
+        } catch (error) {
+            console.error("Failed to fetch sections", error);
+            setSections([]);
+        } finally {
+            setLoadingSections(false);
+        }
+    };
+
+    const fetchRoutines = async () => {
+        try {
+            const res = await GetRequest("/class-routine");
+            // Handle nested { data: { data: [...] } } structure
+            const rawData = res.data?.data || res.data || [];
+            const data = Array.isArray(rawData) ? rawData : rawData.data || [];
+            setRoutines(data);
+        } catch (error) {
+            console.error("Failed to fetch routines", error);
+            setRoutines([]);
+        }
+    };
+
     useEffect(() => {
+        fetchFaculties();
         fetchRoutines();
-        fetchSemesters();
     }, []);
+
+    useEffect(() => {
+        fetchBatches(watchedFaculty);
+        setValue('batchId', '');
+        setValue('semesterId', '');
+        setValue('sectionId', '');
+    }, [watchedFaculty]);
+
+    useEffect(() => {
+        fetchSemesters(watchedBatch);
+        setValue('semesterId', '');
+        setValue('sectionId', '');
+    }, [watchedBatch]);
+
+    useEffect(() => {
+        fetchSections(watchedSemester);
+        setValue('sectionId', '');
+    }, [watchedSemester]);
 
     const openCreateModal = () => {
         reset({
+            facultyId: '',
+            batchId: '',
             semesterId: '',
+            sectionId: '',
             class: {
                 day: 'Monday',
                 index: 1,
@@ -131,8 +241,16 @@ export default function ClassRoutinePage() {
             const res = await GetRequest(`/class-routine/${routine.id}`);
             const data = res.data?.data || res.data || routine;
 
+            const classSection = data.classSection || {};
+            const semester = classSection.semester || {};
+            const batch = semester.batch || {};
+            const faculty = batch.faculty || {};
+
             reset({
-                semesterId: data.semesterId || data.semester?.id || '',
+                facultyId: faculty.id || '',
+                batchId: batch.id || '',
+                semesterId: semester.id || '',
+                sectionId: classSection.id || '',
                 class: {
                     day: data.day,
                     index: data.index || 1,
@@ -143,6 +261,11 @@ export default function ClassRoutinePage() {
                     roomNo: data.roomNo || '',
                 },
             });
+
+            // Pre-load cascading options
+            if (faculty.id) await fetchBatches(faculty.id);
+            if (batch.id) await fetchSemesters(batch.id);
+            if (semester.id) await fetchSections(semester.id);
 
             setIsEditMode(true);
             setEditingId(data.id);
@@ -166,7 +289,7 @@ export default function ClassRoutinePage() {
             };
 
             const payload = {
-                semesterId: formData.semesterId,
+                classSectionId: formData.sectionId,
                 ...classPayload,
             };
 
@@ -174,7 +297,7 @@ export default function ClassRoutinePage() {
                 await PatchRequest(`/class-routine/${editingId}`, payload);
             } else {
                 await PostRequest("/class-routine", {
-                    semesterId: formData.semesterId,
+                    classSectionId: formData.sectionId,
                     classes: [classPayload],
                 });
             }
@@ -187,11 +310,10 @@ export default function ClassRoutinePage() {
         }
     };
 
-    // Prepare semester options for Select
-    const semesterOptions = semesters.map((sem) => ({
-        value: sem.id,
-        label: `${sem.name} `,
-    }));
+    const facultyOptions = faculties.map((f) => ({ value: f.id, label: f.name }));
+    const batchOptions = batches.map((b) => ({ value: b.id, label: `${b.name} (${b.year})` }));
+    const semesterOptions = semesters.map((s) => ({ value: s.id, label: s.name }));
+    const sectionOptions = sections.map((s) => ({ value: s.id, label: s.name }));
 
     return (
         <MantineProvider theme={theme} defaultColorScheme="light">
@@ -212,38 +334,59 @@ export default function ClassRoutinePage() {
                         <Table.Thead>
                             <Table.Tr>
                                 <Table.Th>Day</Table.Th>
+                                <Table.Th>Period</Table.Th>
                                 <Table.Th>Time</Table.Th>
                                 <Table.Th>Subject</Table.Th>
                                 <Table.Th>Teacher</Table.Th>
                                 <Table.Th>Room</Table.Th>
-                                <Table.Th>Semester</Table.Th>
+                                <Table.Th>Class Details</Table.Th>
                                 <Table.Th>Actions</Table.Th>
                             </Table.Tr>
                         </Table.Thead>
                         <Table.Tbody>
-                            {routines.map((r) => (
-                                <Table.Tr key={r.id}>
-                                    <Table.Td>{r.day}</Table.Td>
-                                    <Table.Td>{r.startTime} - {r.endTime}</Table.Td>
-                                    <Table.Td fw={600}>{r.subject}</Table.Td>
-                                    <Table.Td>{r.teacher}</Table.Td>
-                                    <Table.Td>{r.roomNo || '-'}</Table.Td>
-                                    <Table.Td>
-                                        <Badge size="sm" color="indigo">
-                                            {r.semester?.name || r.semesterId?.slice(0, 8) || 'N/A'}
-                                        </Badge>
-                                    </Table.Td>
-                                    <Table.Td>
-                                        <ActionIcon color="blue" variant="subtle" onClick={() => openEditModal(r)}>
-                                            <IconEdit size={18} />
-                                        </ActionIcon>
-                                    </Table.Td>
-                                </Table.Tr>
-                            ))}
+                            {routines.map((r) => {
+                                const section = r.classSection || {};
+                                const semester = section.semester || {};
+                                const batch = semester.batch || {};
+                                const faculty = batch.faculty || {};
+
+                                return (
+                                    <Table.Tr key={r.id}>
+                                        <Table.Td>{r.day}</Table.Td>
+                                        <Table.Td>{r.index}</Table.Td>
+                                        <Table.Td>{r.startTime} - {r.endTime}</Table.Td>
+                                        <Table.Td fw={600}>{r.subject}</Table.Td>
+                                        <Table.Td>{r.teacher}</Table.Td>
+                                        <Table.Td>{r.roomNo || '-'}</Table.Td>
+                                        <Table.Td>
+                                            <Stack gap={4}>
+                                                <Badge size="sm" color="violet" variant="light">
+                                                    {faculty.name || 'N/A'}
+                                                </Badge>
+                                                <Badge size="sm" color="blue" variant="light">
+                                                    {batch.name?.replace("'", "")} ({batch.year})
+                                                </Badge>
+                                                <Badge size="sm" color="teal" variant="light">
+                                                    {semester.name}
+                                                </Badge>
+                                                <Badge size="sm" color="orange">
+                                                    {section.name}
+                                                </Badge>
+                                            </Stack>
+                                        </Table.Td>
+                                        <Table.Td>
+                                            <ActionIcon color="blue" variant="subtle" onClick={() => openEditModal(r)}>
+                                                <IconEdit size={18} />
+                                            </ActionIcon>
+                                        </Table.Td>
+                                    </Table.Tr>
+                                );
+                            })}
                         </Table.Tbody>
                     </Table>
                 )}
 
+                {/* Modal remains the same */}
                 <Modal
                     opened={modalOpened}
                     onClose={() => setModalOpened(false)}
@@ -254,6 +397,42 @@ export default function ClassRoutinePage() {
                     <form onSubmit={handleSubmit(onSubmit)}>
                         <Stack gap="md">
                             <Controller
+                                name="facultyId"
+                                control={control}
+                                rules={{ required: "Please select a faculty" }}
+                                render={({ field, fieldState }) => (
+                                    <Select
+                                        label="Faculty"
+                                        placeholder="Select faculty"
+                                        data={facultyOptions}
+                                        searchable
+                                        disabled={loadingFaculties}
+                                        rightSection={loadingFaculties ? <Loader size="xs" /> : null}
+                                        error={fieldState.error?.message}
+                                        {...field}
+                                    />
+                                )}
+                            />
+
+                            <Controller
+                                name="batchId"
+                                control={control}
+                                rules={{ required: "Please select a batch" }}
+                                render={({ field, fieldState }) => (
+                                    <Select
+                                        label="Batch"
+                                        placeholder="Select batch"
+                                        data={batchOptions}
+                                        searchable
+                                        disabled={!watchedFaculty || loadingBatches}
+                                        rightSection={loadingBatches ? <Loader size="xs" /> : null}
+                                        error={fieldState.error?.message}
+                                        {...field}
+                                    />
+                                )}
+                            />
+
+                            <Controller
                                 name="semesterId"
                                 control={control}
                                 rules={{ required: "Please select a semester" }}
@@ -262,10 +441,25 @@ export default function ClassRoutinePage() {
                                         label="Semester"
                                         placeholder="Select semester"
                                         data={semesterOptions}
-                                        searchable
-                                        nothingFoundMessage="No semesters found"
-                                        disabled={loadingSemesters}
+                                        disabled={!watchedBatch || loadingSemesters}
                                         rightSection={loadingSemesters ? <Loader size="xs" /> : null}
+                                        error={fieldState.error?.message}
+                                        {...field}
+                                    />
+                                )}
+                            />
+
+                            <Controller
+                                name="sectionId"
+                                control={control}
+                                rules={{ required: "Please select a section" }}
+                                render={({ field, fieldState }) => (
+                                    <Select
+                                        label="Section"
+                                        placeholder="Select section"
+                                        data={sectionOptions}
+                                        disabled={!watchedSemester || loadingSections}
+                                        rightSection={loadingSections ? <Loader size="xs" /> : null}
                                         required
                                         error={fieldState.error?.message}
                                         {...field}

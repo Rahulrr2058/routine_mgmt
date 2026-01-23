@@ -149,7 +149,7 @@ export default function SemestersPage() {
 
     const onSingleSubmit = async (data: SemesterFormData) => {
         const formattedData = {
-            semesterName: data.name,
+            name: data.name,
             isActive: data.isActive,
             isCurrent: data.isCurrent,
             batchId: data.batchId,
@@ -188,7 +188,7 @@ export default function SemestersPage() {
         label: `${batch.name} - ${batch.year}`,
     }));
 
-    const rows = semesters.map((sem) => (
+    const rows = semesters.map((sem:any) => (
         <Table.Tr key={sem.id}>
             <Table.Td>
                 <Group gap="sm">
@@ -201,6 +201,8 @@ export default function SemestersPage() {
                     {sem.isActive ? 'Active' : 'Inactive'}
                 </Badge>
             </Table.Td>
+            <Table.Td>{sem?.batch.name}</Table.Td>
+            <Table.Td>{sem?.batch.year}</Table.Td>
             <Table.Td>
                 {sem.isCurrent ? (
                     <Badge color="teal" leftSection={<IconSchool size={14} />}>
@@ -259,6 +261,8 @@ export default function SemestersPage() {
                             <Table.Tr>
                                 <Table.Th>Semester Name</Table.Th>
                                 <Table.Th>Status</Table.Th>
+                                <Table.Th>Batch</Table.Th>
+                                <Table.Th>Batch Year</Table.Th>
                                 <Table.Th>Current</Table.Th>
                                 <Table.Th>Actions</Table.Th>
                             </Table.Tr>
