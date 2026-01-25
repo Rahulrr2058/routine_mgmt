@@ -18,7 +18,7 @@ import {
 } from '@mantine/core';
 import { IconCheck, IconX, IconCalendarEvent } from '@tabler/icons-react';
 import { AdminDashboardLayout } from "@/layouts/AdminDashboardLayout";
-import { GetRequest, PatchRequest } from "@/plugins/https";
+import {GetRequest, PatchRequest, PostRequest} from "@/plugins/https";
 import { format } from 'date-fns';
 
 const theme = createTheme({ primaryColor: 'indigo' });
@@ -82,6 +82,20 @@ export default function DailyClassPage() {
         }
     };
 
+    const handleGenerateClass = async () => {
+        try{
+            const res = await PostRequest("/daily-class/generate-daily-class",{});
+            fetchTodaysClasses();
+
+        }
+        catch(err: any)
+        {
+            console.error("Failed to generate class", err);
+            alert("Failed to generate class");
+
+        }
+    }
+
     useEffect(() => {
         fetchTodaysClasses();
     }, []);
@@ -121,6 +135,10 @@ export default function DailyClassPage() {
                             <Text size="lg" c="dimmed">{todayFormatted}</Text>
                         </Group>
                     </Stack>
+                    <Button variant="outline" color="teal" onClick={()=> handleGenerateClass()}>
+                        Show Daily Routine
+                    </Button>
+
                     <Button
                         onClick={fetchTodaysClasses}
                         loading={loading}
