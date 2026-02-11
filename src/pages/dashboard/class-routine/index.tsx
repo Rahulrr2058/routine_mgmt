@@ -5,569 +5,540 @@ import {
     createTheme,
     Title,
     Button,
-    Modal,
-    Select,
     Group,
     Stack,
     Paper,
     Badge,
-    ActionIcon,
-    Text,
+    Card,
     Grid,
+    Text,
+    ActionIcon,
     Table,
     Loader,
+    Breadcrumbs,
+    Anchor,
+    Modal,
+    Select,
     TextInput,
+    NumberInput,
 } from '@mantine/core';
 import { useForm, Controller } from 'react-hook-form';
-import { IconPlus, IconEdit } from '@tabler/icons-react';
+import { IconPlus, IconArrowLeft, IconChevronRight } from '@tabler/icons-react';
 import { AdminDashboardLayout } from "@/layouts/AdminDashboardLayout";
 import { GetRequest, PostRequest, PatchRequest } from "@/plugins/https";
 
 const theme = createTheme({ primaryColor: 'indigo' });
 
-const WEEK_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const WEEK_DAYS_ORDER = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-interface Faculty {
+interface Faculty { id: string; name: string; isActive: boolean; }
+interface Batch   { id: string; name: string; year: string; isActive: boolean; faculty?: Faculty; }
+interface Semester{ id: string; name: string; isActive: boolean; batch?: Batch; }
+interface Section { id: string; name: string; semester?: Semester; }
+
+interface Teacher { id: string; name: string; isActive: boolean; subject: TeacherSubject[]; }
+interface TeacherSubject { id: string; name: string; code: string; isActive: boolean; }
+
+interface Routine {
     id: string;
-    name: string;
-    isActive: boolean;
-}
-
-interface Batch {
-    id: string;
-    name: string;
-    year: string;
-    isActive: boolean;
-    faculty: Faculty;
-}
-
-interface Semester {
-    id: string;
-    name: string;
-    isActive: boolean;
-    isCurrent?: boolean;
-    batch: Batch;
-}
-
-interface Section {
-    id: string;
-    name: string;
-    semester: Semester;
-}
-
-interface ClassEntry {
     day: string;
     index: number;
     startTime: string;
     endTime: string;
-    subject: string;
-    teacher: string;
     roomNo?: string;
+    teacher: { id: string; name: string; isActive: boolean };
+    subject: { id: string; name: string; code: string; isActive: boolean };
+    classSection: { id: string; name: string; semester?: Semester };
 }
 
 type FormData = {
-    facultyId: string;
-    batchId: string;
-    semesterId: string;
-    sectionId: string;
-    class: ClassEntry;
+    day: string;
+    index: number;
+    startTime: string;
+    endTime: string;
+    teacher: string;       // teacher id
+    subject: string;       // subject name
+    subjectCode: string;
+    roomNo: string;
 };
 
 export default function ClassRoutinePage() {
-    const [routines, setRoutines] = useState<any[]>([]);
     const [faculties, setFaculties] = useState<Faculty[]>([]);
     const [batches, setBatches] = useState<Batch[]>([]);
     const [semesters, setSemesters] = useState<Semester[]>([]);
     const [sections, setSections] = useState<Section[]>([]);
+    const [routines, setRoutines] = useState<Routine[]>([]);
+    const [teachers, setTeachers] = useState<Teacher[]>([]);
+    const [teacherSubjects, setTeacherSubjects] = useState<TeacherSubject[]>([]);
 
-    const [loadingFaculties, setLoadingFaculties] = useState(true);
-    const [loadingBatches, setLoadingBatches] = useState(false);
-    const [loadingSemesters, setLoadingSemesters] = useState(false);
-    const [loadingSections, setLoadingSections] = useState(false);
+    const [selectedFaculty, setSelectedFaculty] = useState<Faculty | null>(null);
+    const [selectedBatch, setSelectedBatch] = useState<Batch | null>(null);
+    const [selectedSemester, setSelectedSemester] = useState<Semester | null>(null);
+    const [selectedSection, setSelectedSection] = useState<Section | null>(null);
 
-    const [modalOpened, setModalOpened] = useState(false);
-    const [isEditMode, setIsEditMode] = useState(false);
-    const [editingId, setEditingId] = useState<string | null>(null);
+    const [modalOpen, setModalOpen] = useState(false);
+    const [editingRoutine, setEditingRoutine] = useState<Routine | null>(null);
 
-    const { control, handleSubmit, reset, watch, setValue } = useForm<FormData>({
+    const [loading, setLoading] = useState({ fac: true, tea: true });
+
+    const form = useForm<FormData>({
         defaultValues: {
-            facultyId: '',
-            batchId: '',
-            semesterId: '',
-            sectionId: '',
-            class: {
-                day: 'Monday',
-                index: 1,
-                startTime: '09:00',
-                endTime: '10:30',
-                subject: '',
-                teacher: '',
-                roomNo: '',
-            },
-        },
+            day: 'Sunday',
+            index: 1,
+            startTime: '',
+            endTime: '',
+            teacher: '',
+            subject: '',
+            subjectCode: '',
+            roomNo: '',
+        }
     });
 
-    const watchedFaculty = watch('facultyId');
-    const watchedBatch = watch('batchId');
-    const watchedSemester = watch('semesterId');
+    const watchedTeacher = form.watch('teacher');
 
-    const fetchFaculties = async () => {
-        try {
-            setLoadingFaculties(true);
-            const res = await GetRequest("/faculty");
-            const data = Array.isArray(res.data) ? res.data : res.data?.data || [];
-            setFaculties(data.filter((f: Faculty) => f.isActive));
-        } catch (error) {
-            console.error("Failed to fetch faculties", error);
-            setFaculties([]);
-        } finally {
-            setLoadingFaculties(false);
-        }
-    };
-
-    const fetchBatches = async (facultyId: string) => {
-        if (!facultyId) {
-            setBatches([]);
-            return;
-        }
-        try {
-            setLoadingBatches(true);
-            const res = await GetRequest(`/batch/faculties/${facultyId}`);
-            const data = Array.isArray(res.data) ? res.data : res.data?.data || [];
-            setBatches(data);
-        } catch (error) {
-            console.error("Failed to fetch batches", error);
-            setBatches([]);
-        } finally {
-            setLoadingBatches(false);
-        }
-    };
-
-    const fetchSemesters = async (batchId: string) => {
-        if (!batchId) {
-            setSemesters([]);
-            return;
-        }
-        try {
-            setLoadingSemesters(true);
-            const res = await GetRequest(`/semester/batches/${batchId}`);
-            const data = Array.isArray(res.data) ? res.data : res.data?.data || [];
-            setSemesters(data);
-        } catch (error) {
-            console.error("Failed to fetch semesters", error);
-            setSemesters([]);
-        } finally {
-            setLoadingSemesters(false);
-        }
-    };
-
-    const fetchSections = async (semesterId: string) => {
-        if (!semesterId) {
-            setSections([]);
-            return;
-        }
-        try {
-            setLoadingSections(true);
-            const res = await GetRequest(`/class-sections/semester/${semesterId}`);
-            const data = Array.isArray(res.data) ? res.data : res.data?.data || [];
-            setSections(data);
-        } catch (error) {
-            console.error("Failed to fetch sections", error);
-            setSections([]);
-        } finally {
-            setLoadingSections(false);
-        }
-    };
-
-    const fetchRoutines = async () => {
-        try {
-            const res = await GetRequest("/class-routine");
-            // Handle nested { data: { data: [...] } } structure
-            const rawData = res.data?.data || res.data || [];
-            const data = Array.isArray(rawData) ? rawData : rawData.data || [];
-            setRoutines(data);
-        } catch (error) {
-            console.error("Failed to fetch routines", error);
-            setRoutines([]);
-        }
-    };
-
+    // ─── Fetch initial data ────────────────────────────────────────
     useEffect(() => {
-        fetchFaculties();
-        fetchRoutines();
+        const init = async () => {
+            try {
+                const [facRes, teaRes] = await Promise.all([
+                    GetRequest("/faculty"),
+                    GetRequest("/teachers")
+                ]);
+                setFaculties((facRes.data?.data || facRes.data || []).filter((f: Faculty) => f.isActive));
+                setTeachers((teaRes.data?.data || teaRes.data || []).filter((t: Teacher) => t.isActive));
+            } catch (err) {
+                console.error(err);
+            } finally {
+                setLoading(l => ({ ...l, fac: false, tea: false }));
+            }
+        };
+        init();
     }, []);
 
     useEffect(() => {
-        fetchBatches(watchedFaculty);
-        setValue('batchId', '');
-        setValue('semesterId', '');
-        setValue('sectionId', '');
-    }, [watchedFaculty]);
+        if (!selectedFaculty?.id) return;
+        GetRequest(`/batch/faculties/${selectedFaculty.id}`)
+            .then((r:any) => setBatches(r.data?.data || r.data || []))
+            .catch(() => {});
+    }, [selectedFaculty]);
 
     useEffect(() => {
-        fetchSemesters(watchedBatch);
-        setValue('semesterId', '');
-        setValue('sectionId', '');
-    }, [watchedBatch]);
+        if (!selectedBatch?.id) return;
+        GetRequest(`/semester/batches/${selectedBatch.id}`)
+            .then((r:any) => setSemesters(r.data?.data || r.data || []))
+            .catch(() => {});
+    }, [selectedBatch]);
 
     useEffect(() => {
-        fetchSections(watchedSemester);
-        setValue('sectionId', '');
-    }, [watchedSemester]);
+        if (!selectedSemester?.id) return;
+        GetRequest(`/class-sections/semester/${selectedSemester.id}`)
+            .then((r:any) => setSections(r.data?.data || r.data || []))
+            .catch(() => {});
+    }, [selectedSemester]);
 
-    const openCreateModal = () => {
-        reset({
-            facultyId: '',
-            batchId: '',
-            semesterId: '',
-            sectionId: '',
-            class: {
-                day: 'Monday',
-                index: 1,
-                startTime: '09:00',
-                endTime: '10:30',
-                subject: '',
-                teacher: '',
-                roomNo: '',
-            },
-        });
-        setIsEditMode(false);
-        setEditingId(null);
-        setModalOpened(true);
-    };
-
-    const openEditModal = async (routine: any) => {
-        try {
-            const res = await GetRequest(`/class-routine/${routine.id}`);
-            const data = res.data?.data || res.data || routine;
-
-            const classSection = data.classSection || {};
-            const semester = classSection.semester || {};
-            const batch = semester.batch || {};
-            const faculty = batch.faculty || {};
-
-            reset({
-                facultyId: faculty.id || '',
-                batchId: batch.id || '',
-                semesterId: semester.id || '',
-                sectionId: classSection.id || '',
-                class: {
-                    day: data.day,
-                    index: data.index || 1,
-                    startTime: data.startTime,
-                    endTime: data.endTime,
-                    subject: data.subject || '',
-                    teacher: data.teacher || '',
-                    roomNo: data.roomNo || '',
-                },
-            });
-
-            // Pre-load cascading options
-            if (faculty.id) await fetchBatches(faculty.id);
-            if (batch.id) await fetchSemesters(batch.id);
-            if (semester.id) await fetchSections(semester.id);
-
-            setIsEditMode(true);
-            setEditingId(data.id);
-            setModalOpened(true);
-        } catch (error) {
-            console.error("Failed to load routine", error);
-            alert("Could not load routine for editing");
+    // Fetch routines when section is selected
+    useEffect(() => {
+        if (!selectedSection?.id) {
+            setRoutines([]);
+            return;
         }
+        (async () => {
+            try {
+                const res = await GetRequest(`/class-routine?sectionId=${selectedSection.id}`);
+                const raw = res.data?.data?.data || res.data?.data || res.data || [];
+                setRoutines(raw);
+            } catch (err) {
+                console.error("Failed to load routines", err);
+                setRoutines([]);
+            }
+        })();
+    }, [selectedSection]);
+
+    // Teacher subjects when teacher selected
+    useEffect(() => {
+        if (!watchedTeacher) {
+            setTeacherSubjects([]);
+            form.setValue('subject', '');
+            form.setValue('subjectCode', '');
+            return;
+        }
+        (async () => {
+            try {
+                const res = await GetRequest(`/teachers/${watchedTeacher}`);
+                const subs = res.data?.data?.subject || res.data?.subject || [];
+                setTeacherSubjects(subs);
+                form.setValue('subject', '');
+                form.setValue('subjectCode', '');
+            } catch {}
+        })();
+    }, [watchedTeacher]);
+
+    useEffect(() => {
+        if (!form.watch('subject') || !teacherSubjects.length) {
+            form.setValue('subjectCode', '');
+            return;
+        }
+        const sub = teacherSubjects.find(s => s.name === form.watch('subject'));
+        form.setValue('subjectCode', sub?.code || '');
+    }, [form.watch('subject'), teacherSubjects]);
+
+    // ─── Modal Handlers ────────────────────────────────────────────
+    const openAddModal = () => {
+        form.reset();
+        setEditingRoutine(null);
+        setModalOpen(true);
     };
 
-    const onSubmit = async (formData: FormData) => {
+    const openEditModal = (routine: Routine) => {
+        form.reset({
+            day: routine.day,
+            index: routine.index,
+            startTime: routine.startTime,
+            endTime: routine.endTime,
+            teacher: routine.teacher.id,
+            subject: routine.subject.name,
+            subjectCode: routine.subject.code,
+            roomNo: routine.roomNo || '',
+        });
+        setEditingRoutine(routine);
+        setModalOpen(true);
+    };
+
+    const onSubmit = async (values: FormData) => {
         try {
-            const classPayload = {
-                day: formData.class.day,
-                index: Number(formData.class.index),
-                startTime: formData.class.startTime,
-                endTime: formData.class.endTime,
-                subject: formData.class.subject,
-                teacher: formData.class.teacher,
-                roomNo: formData.class.roomNo?.trim() || undefined,
-            };
-
-            const payload = {
-                classSectionId: formData.sectionId,
-                ...classPayload,
-            };
-
-            if (isEditMode && editingId) {
-                await PatchRequest(`/class-routine/${editingId}`, payload);
+            if (editingRoutine?.id) {
+                // PATCH
+                const payload = {
+                    day: values.day,
+                    index: values.index,
+                    startTime: values.startTime,
+                    endTime: values.endTime,
+                    roomNo: values.roomNo?.trim() || undefined,
+                    teacher: values.teacher,
+                    subject: values.subject,
+                };
+                await PatchRequest(`/class-routine/${editingRoutine.id}`, payload);
             } else {
-                await PostRequest("/class-routine", {
-                    classSectionId: formData.sectionId,
-                    classes: [classPayload],
-                });
+                // POST
+                const payload = {
+                    classSectionId: selectedSection?.id,
+                    teacher: values.teacher,
+                    subject: values.subject,
+                    classes: [{
+                        day: values.day,
+                        index: values.index,
+                        startTime: values.startTime,
+                        endTime: values.endTime,
+                        roomNo: values.roomNo?.trim() || undefined,
+                    }],
+                };
+                await PostRequest("/class-routine", payload);
             }
 
-            await fetchRoutines();
-            setModalOpened(false);
-        } catch (error: any) {
-            console.error("Save failed:", error);
-            alert(error.response?.data?.message || "Failed to save routine");
+            // Refresh routines
+            if (selectedSection?.id) {
+                const res = await GetRequest(`/class-routine?sectionId=${selectedSection.id}`);
+                const raw = res.data?.data?.data || res.data?.data || res.data || [];
+                setRoutines(raw);
+            }
+
+            setModalOpen(false);
+        } catch (err: any) {
+            console.error(err);
+            alert(err.response?.data?.message || "Failed to save routine");
         }
     };
 
-    const facultyOptions = faculties.map((f) => ({ value: f.id, label: f.name }));
-    const batchOptions = batches.map((b) => ({ value: b.id, label: `${b.name} (${b.year})` }));
-    const semesterOptions = semesters.map((s) => ({ value: s.id, label: s.name }));
-    const sectionOptions = sections.map((s) => ({ value: s.id, label: s.name }));
+    // ─── Breadcrumbs ───────────────────────────────────────────────
+    const breadcrumbItems = [
+        <Anchor key="faculties" onClick={() => { setSelectedFaculty(null); setSelectedBatch(null); setSelectedSemester(null); setSelectedSection(null); }}>Faculties</Anchor>,
+        selectedFaculty && <Anchor key="faculty" onClick={() => { setSelectedBatch(null); setSelectedSemester(null); setSelectedSection(null); }}>{selectedFaculty.name}</Anchor>,
+        selectedBatch && <Anchor key="batch" onClick={() => { setSelectedSemester(null); setSelectedSection(null); }}>{selectedBatch.name} ({selectedBatch.year})</Anchor>,
+        selectedSemester && <Anchor key="semester" onClick={() => setSelectedSection(null)}>{selectedSemester.name}</Anchor>,
+        selectedSection && <Text key="section">{selectedSection.name}</Text>,
+    ].filter(Boolean) as React.ReactNode[];
 
-    return (
-        <MantineProvider theme={theme} defaultColorScheme="light">
-            <div className="p-8 max-w-7xl mx-auto">
-                <Group justify="space-between" mb="xl">
-                    <Title order={1}>Class Routines Management</Title>
-                    <Button leftSection={<IconPlus size={18} />} onClick={openCreateModal} color="teal">
-                        Add New Class
+    // ─── Render Content ────────────────────────────────────────────
+    let content: React.ReactNode = null;
+
+    if (!selectedFaculty) {
+        content = (
+            <Grid>
+                {faculties.map(f => (
+                    <Grid.Col key={f.id} span={{ base: 12, sm: 6, md: 4, lg: 3 }}>
+                        <Card shadow="sm" padding="lg" radius="md" withBorder style={{ cursor: 'pointer' }} onClick={() => setSelectedFaculty(f)}>
+                            <Stack align="center" gap="xs">
+                                <Text fw={600} size="lg">{f.name}</Text>
+                                <Badge color="indigo">Faculty</Badge>
+                            </Stack>
+                            <Group mt="md" justify="center">
+                                <Text c="dimmed">View Batches →</Text>
+                                <IconChevronRight size={16} />
+                            </Group>
+                        </Card>
+                    </Grid.Col>
+                ))}
+                {faculties.length === 0 && <Text c="dimmed" ta="center">No faculties found</Text>}
+            </Grid>
+        );
+    } else if (!selectedBatch) {
+        content = (
+            <>
+                <Button variant="subtle" leftSection={<IconArrowLeft />} onClick={() => setSelectedFaculty(null)} mb="md">
+                    Back to Faculties
+                </Button>
+                <Grid>
+                    {batches.map(b => (
+                        <Grid.Col key={b.id} span={{ base: 12, sm: 6, md: 4 }}>
+                            <Card shadow="sm" padding="lg" radius="md" withBorder style={{ cursor: 'pointer' }} onClick={() => setSelectedBatch(b)}>
+                                <Text fw={600}>{b.name}</Text>
+                                <Text size="sm" c="dimmed">Year: {b.year}</Text>
+                            </Card>
+                        </Grid.Col>
+                    ))}
+                </Grid>
+            </>
+        );
+    } else if (!selectedSemester) {
+        content = (
+            <>
+                <Button variant="subtle" leftSection={<IconArrowLeft />} onClick={() => setSelectedBatch(null)} mb="md">
+                    Back to Batches
+                </Button>
+                <Grid>
+                    {semesters.map(s => (
+                        <Grid.Col key={s.id} span={{ base: 12, sm: 6, md: 4 }}>
+                            <Card shadow="sm" padding="lg" radius="md" withBorder style={{ cursor: 'pointer' }} onClick={() => setSelectedSemester(s)}>
+                                <Text fw={600}>{s.name}</Text>
+                            </Card>
+                        </Grid.Col>
+                    ))}
+                </Grid>
+            </>
+        );
+    } else if (!selectedSection) {
+        content = (
+            <>
+                <Button variant="subtle" leftSection={<IconArrowLeft />} onClick={() => setSelectedSemester(null)} mb="md">
+                    Back to Semesters
+                </Button>
+                <Grid>
+                    {sections.map(sec => (
+                        <Grid.Col key={sec.id} span={{ base: 12, sm: 6, md: 4 }}>
+                            <Card shadow="sm" padding="lg" radius="md" withBorder style={{ cursor: 'pointer' }} onClick={() => setSelectedSection(sec)}>
+                                <Text fw={600} size="lg">{sec.name}</Text>
+                                <Text c="dimmed" mt="xs">Click to view timetable</Text>
+                            </Card>
+                        </Grid.Col>
+                    ))}
+                </Grid>
+            </>
+        );
+    } else {
+        // ─── Timetable sorted by index (period) ───────────────────────
+        const uniqueIndices = [...new Set(routines.map(r => r.index))].sort((a, b) => a - b);
+
+        const indexToTimeLabel = new Map<number, string>();
+        routines.forEach(r => {
+            if (!indexToTimeLabel.has(r.index)) {
+                indexToTimeLabel.set(r.index, `${r.startTime} – ${r.endTime}`);
+            }
+        });
+
+        const presentDays = [...new Set(routines.map(r => r.day))]
+            .sort((a, b) => WEEK_DAYS_ORDER.indexOf(a) - WEEK_DAYS_ORDER.indexOf(b));
+
+        const routinesByDay: Record<string, Routine[]> = {};
+        presentDays.forEach(d => {
+            routinesByDay[d] = routines.filter(r => r.day === d);
+        });
+
+        content = (
+            <>
+                <Group mb="xl" justify="apart" align="center">
+                    <Group>
+                        <Button variant="subtle" leftSection={<IconArrowLeft size={18} />} onClick={() => setSelectedSection(null)}>
+                            Back to Sections
+                        </Button>
+                        <div>
+                            <Title order={2}>{selectedSection?.name} Timetable</Title>
+                            <Text c="dimmed" size="sm">
+                                {selectedSemester?.name?.trim() || '—'} • {selectedBatch?.name || '—'} ({selectedBatch?.year || '—'})
+                            </Text>
+                        </div>
+                    </Group>
+
+                    <Button leftSection={<IconPlus size={18} />} color="teal" onClick={openAddModal}>
+                        Add Slot
                     </Button>
                 </Group>
 
                 {routines.length === 0 ? (
-                    <Paper p="xl" withBorder>
-                        <Text c="dimmed" ta="center">No class routines added yet.</Text>
+                    <Paper p="xl" withBorder radius="md" ta="center" c="dimmed">
+                        No classes scheduled yet for this section.
                     </Paper>
                 ) : (
-                    <Table withTableBorder withColumnBorders>
-                        <Table.Thead>
-                            <Table.Tr>
-                                <Table.Th>Day</Table.Th>
-                                <Table.Th>Period</Table.Th>
-                                <Table.Th>Time</Table.Th>
-                                <Table.Th>Subject</Table.Th>
-                                <Table.Th>Teacher</Table.Th>
-                                <Table.Th>Room</Table.Th>
-                                <Table.Th>Class Details</Table.Th>
-                                <Table.Th>Actions</Table.Th>
-                            </Table.Tr>
-                        </Table.Thead>
-                        <Table.Tbody>
-                            {routines.map((r) => {
-                                const section = r.classSection || {};
-                                const semester = section.semester || {};
-                                const batch = semester.batch || {};
-                                const faculty = batch.faculty || {};
+                    <Paper withBorder radius="md" shadow="xs" p="md" style={{ overflowX: 'auto' }}>
+                        <Table
+                            withTableBorder
+                            withColumnBorders
+                            striped
+                            highlightOnHover
+                            verticalSpacing="sm"
+                            horizontalSpacing="md"
+                        >
+                            <Table.Thead>
+                                <Table.Tr>
+                                    <Table.Th ta="center" fw={700} style={{ minWidth: 100, background: '#eef2ff' }}>
+                                        Day
+                                    </Table.Th>
+                                    {uniqueIndices.map(idx => (
+                                        <Table.Th
+                                            key={idx}
+                                            ta="center"
+                                            fw={500}
+                                            style={{ minWidth: 160, background: '#f8f9fa' }}
+                                        >
+                                            Period {idx}
+                                            <br />
+                                            <Text size="xs" c="dimmed" fw={400}>
+                                                {indexToTimeLabel.get(idx) || '—'}
+                                            </Text>
+                                        </Table.Th>
+                                    ))}
+                                </Table.Tr>
+                            </Table.Thead>
 
-                                return (
-                                    <Table.Tr key={r.id}>
-                                        <Table.Td>{r.day}</Table.Td>
-                                        <Table.Td>{r.index}</Table.Td>
-                                        <Table.Td>{r.startTime} - {r.endTime}</Table.Td>
-                                        <Table.Td fw={600}>{r.subject}</Table.Td>
-                                        <Table.Td>{r.teacher}</Table.Td>
-                                        <Table.Td>{r.roomNo || '-'}</Table.Td>
-                                        <Table.Td>
-                                            <Stack gap={4}>
-                                                <Badge size="sm" color="violet" variant="light">
-                                                    {faculty.name || 'N/A'}
-                                                </Badge>
-                                                <Badge size="sm" color="blue" variant="light">
-                                                    {batch.name?.replace("'", "")} ({batch.year})
-                                                </Badge>
-                                                <Badge size="sm" color="teal" variant="light">
-                                                    {semester.name}
-                                                </Badge>
-                                                <Badge size="sm" color="orange">
-                                                    {section.name}
-                                                </Badge>
-                                            </Stack>
+                            <Table.Tbody>
+                                {presentDays.map(day => (
+                                    <Table.Tr key={day}>
+                                        <Table.Td fw={700} ta="center" c="indigo.7" style={{ background: '#eef2ff' }}>
+                                            {day}
                                         </Table.Td>
-                                        <Table.Td>
-                                            <ActionIcon color="blue" variant="subtle" onClick={() => openEditModal(r)}>
-                                                <IconEdit size={18} />
-                                            </ActionIcon>
-                                        </Table.Td>
+
+                                        {uniqueIndices.map(idx => {
+                                            const entry = routinesByDay[day]?.find(r => r.index === idx);
+                                            return (
+                                                <Table.Td
+                                                    key={idx}
+                                                    ta="center"
+                                                    style={{ cursor: entry ? 'pointer' : 'default', padding: '8px' }}
+                                                    onClick={() => entry && openEditModal(entry)}
+                                                >
+                                                    {entry ? (
+                                                        <Stack gap={4} align="center">
+                                                            <Text fw={600} size="sm" lh={1.2}>
+                                                                {entry.subject.name}
+                                                            </Text>
+                                                            <Text size="xs" c="gray.7" fw={500}>
+                                                                {entry.teacher.name}
+                                                            </Text>
+                                                            {entry.roomNo && (
+                                                                <Badge size="xs" color="violet" variant="light" radius="sm">
+                                                                    {entry.roomNo}
+                                                                </Badge>
+                                                            )}
+                                                        </Stack>
+                                                    ) : (
+                                                        <Text size="xs" c="gray.5" fs="italic">—</Text>
+                                                    )}
+                                                </Table.Td>
+                                            );
+                                        })}
                                     </Table.Tr>
-                                );
-                            })}
-                        </Table.Tbody>
-                    </Table>
+                                ))}
+                            </Table.Tbody>
+                        </Table>
+                    </Paper>
+                )}
+            </>
+        );
+    }
+
+    return (
+        <MantineProvider theme={theme} defaultColorScheme="light">
+            <div className="p-6 max-w-[1400px] mx-auto">
+                <Group justify="apart" mb="xl">
+                    <Title order={1}>Class Routine Management</Title>
+                </Group>
+
+                {breadcrumbItems.length > 0 && (
+                    <Paper p="xs" withBorder mb="lg">
+                        <Breadcrumbs separator="→">{breadcrumbItems}</Breadcrumbs>
+                    </Paper>
                 )}
 
-                {/* Modal remains the same */}
+                {loading.fac ? <Loader /> : content}
+
+                {/* ─── Modal ────────────────────────────────────────────────── */}
                 <Modal
-                    opened={modalOpened}
-                    onClose={() => setModalOpened(false)}
-                    title={<Title order={3}>{isEditMode ? 'Edit Class Routine' : 'Add New Class Routine'}</Title>}
+                    opened={modalOpen}
+                    onClose={() => setModalOpen(false)}
+                    title={editingRoutine ? "Edit Entry" : "Add New Entry"}
                     size="lg"
                     centered
                 >
-                    <form onSubmit={handleSubmit(onSubmit)}>
+                    <form onSubmit={form.handleSubmit(onSubmit)}>
                         <Stack gap="md">
                             <Controller
-                                name="facultyId"
-                                control={control}
-                                rules={{ required: "Please select a faculty" }}
-                                render={({ field, fieldState }) => (
+                                name="day"
+                                control={form.control}
+                                rules={{ required: true }}
+                                render={({ field }) => (
+                                    <Select label="Day" data={WEEK_DAYS_ORDER} {...field} />
+                                )}
+                            />
+
+                            <Group grow>
+                                <Controller name="startTime" control={form.control} rules={{ required: true }} render={({ field }) => (
+                                    <TextInput label="Start Time" placeholder="11 or 03:30" {...field} />
+                                )} />
+                                <Controller name="endTime" control={form.control} rules={{ required: true }} render={({ field }) => (
+                                    <TextInput label="End Time" placeholder="12 or 04:30" {...field} />
+                                )} />
+                            </Group>
+
+                            <Controller name="index" control={form.control} rules={{ required: true }} render={({ field }) => (
+                                <NumberInput label="Period Index" min={1} {...field} />
+                            )} />
+
+                            <Controller
+                                name="teacher"
+                                control={form.control}
+                                rules={{ required: "Required" }}
+                                render={({ field }) => (
                                     <Select
-                                        label="Faculty"
-                                        placeholder="Select faculty"
-                                        data={facultyOptions}
+                                        label="Teacher"
+                                        data={teachers.map(t => ({ value: t.id, label: t.name }))}
                                         searchable
-                                        disabled={loadingFaculties}
-                                        rightSection={loadingFaculties ? <Loader size="xs" /> : null}
-                                        error={fieldState.error?.message}
                                         {...field}
                                     />
                                 )}
                             />
 
                             <Controller
-                                name="batchId"
-                                control={control}
-                                rules={{ required: "Please select a batch" }}
-                                render={({ field, fieldState }) => (
+                                name="subject"
+                                control={form.control}
+                                rules={{ required: "Required" }}
+                                render={({ field }) => (
                                     <Select
-                                        label="Batch"
-                                        placeholder="Select batch"
-                                        data={batchOptions}
+                                        label="Subject"
+                                        data={teacherSubjects.map(s => ({ value: s.id, label: `${s.name} (${s.code})` }))}
+                                        disabled={!watchedTeacher}
                                         searchable
-                                        disabled={!watchedFaculty || loadingBatches}
-                                        rightSection={loadingBatches ? <Loader size="xs" /> : null}
-                                        error={fieldState.error?.message}
                                         {...field}
                                     />
                                 )}
                             />
 
-                            <Controller
-                                name="semesterId"
-                                control={control}
-                                rules={{ required: "Please select a semester" }}
-                                render={({ field, fieldState }) => (
-                                    <Select
-                                        label="Semester"
-                                        placeholder="Select semester"
-                                        data={semesterOptions}
-                                        disabled={!watchedBatch || loadingSemesters}
-                                        rightSection={loadingSemesters ? <Loader size="xs" /> : null}
-                                        error={fieldState.error?.message}
-                                        {...field}
-                                    />
-                                )}
-                            />
+                            <TextInput label="Subject Code" value={form.watch('subjectCode')} disabled readOnly />
 
-                            <Controller
-                                name="sectionId"
-                                control={control}
-                                rules={{ required: "Please select a section" }}
-                                render={({ field, fieldState }) => (
-                                    <Select
-                                        label="Section"
-                                        placeholder="Select section"
-                                        data={sectionOptions}
-                                        disabled={!watchedSemester || loadingSections}
-                                        rightSection={loadingSections ? <Loader size="xs" /> : null}
-                                        required
-                                        error={fieldState.error?.message}
-                                        {...field}
-                                    />
-                                )}
-                            />
+                            <TextInput label="Room No" {...form.register('roomNo')} />
 
-                            <Grid gutter="md">
-                                <Grid.Col span={6}>
-                                    <Controller
-                                        name="class.day"
-                                        control={control}
-                                        render={({ field }) => (
-                                            <Select label="Day" data={WEEK_DAYS} required {...field} />
-                                        )}
-                                    />
-                                </Grid.Col>
-
-                                <Grid.Col span={3}>
-                                    <Controller
-                                        name="class.startTime"
-                                        control={control}
-                                        rules={{ required: true }}
-                                        render={({ field }) => (
-                                            <TextInput label="Start Time" placeholder="09:00" required {...field} />
-                                        )}
-                                    />
-                                </Grid.Col>
-
-                                <Grid.Col span={3}>
-                                    <Controller
-                                        name="class.endTime"
-                                        control={control}
-                                        rules={{ required: true }}
-                                        render={({ field }) => (
-                                            <TextInput label="End Time" placeholder="10:30" required {...field} />
-                                        )}
-                                    />
-                                </Grid.Col>
-
-                                <Grid.Col span={4}>
-                                    <Controller
-                                        name="class.subject"
-                                        control={control}
-                                        rules={{ required: "Subject is required" }}
-                                        render={({ field, fieldState }) => (
-                                            <TextInput
-                                                label="Subject"
-                                                placeholder="Mathematics"
-                                                required
-                                                error={fieldState.error?.message}
-                                                {...field}
-                                            />
-                                        )}
-                                    />
-                                </Grid.Col>
-
-                                <Grid.Col span={4}>
-                                    <Controller
-                                        name="class.teacher"
-                                        control={control}
-                                        rules={{ required: "Teacher is required" }}
-                                        render={({ field, fieldState }) => (
-                                            <TextInput
-                                                label="Teacher"
-                                                placeholder="Dr. Mahesh"
-                                                required
-                                                error={fieldState.error?.message}
-                                                {...field}
-                                            />
-                                        )}
-                                    />
-                                </Grid.Col>
-
-                                <Grid.Col span={2}>
-                                    <Controller
-                                        name="class.index"
-                                        control={control}
-                                        render={({ field }) => (
-                                            <TextInput
-                                                label="Period Index"
-                                                type="number"
-                                                min={1}
-                                                placeholder="1"
-                                                {...field}
-                                                onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
-                                            />
-                                        )}
-                                    />
-                                </Grid.Col>
-
-                                <Grid.Col span={2}>
-                                    <Controller
-                                        name="class.roomNo"
-                                        control={control}
-                                        render={({ field }) => (
-                                            <TextInput label="Room No" placeholder="A102" {...field} />
-                                        )}
-                                    />
-                                </Grid.Col>
-                            </Grid>
-
-                            <Group justify="flex-end" mt="lg">
-                                <Button variant="light" color="gray" onClick={() => setModalOpened(false)}>
-                                    Cancel
-                                </Button>
+                            <Group justify="flex-end" mt="md">
+                                <Button variant="light" onClick={() => setModalOpen(false)}>Cancel</Button>
                                 <Button type="submit" color="teal">
-                                    {isEditMode ? 'Update' : 'Create'} Class
+                                    {editingRoutine ? 'Update' : 'Create'}
                                 </Button>
                             </Group>
                         </Stack>
@@ -578,6 +549,4 @@ export default function ClassRoutinePage() {
     );
 }
 
-ClassRoutinePage.getLayout = (page: any) => (
-    <AdminDashboardLayout>{page}</AdminDashboardLayout>
-);
+ClassRoutinePage.getLayout = (page: any) => <AdminDashboardLayout>{page}</AdminDashboardLayout>;

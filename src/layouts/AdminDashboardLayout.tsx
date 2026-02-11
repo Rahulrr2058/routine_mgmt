@@ -56,6 +56,8 @@ export function AdminDashboardLayout({
         { label: "Class Section", href: "/dashboard/class-section", icon: IconBuildingCommunity },
         { label: "Faculty", href: "/dashboard/faculty", icon: IconBuildingCommunity },
         { label: "Semesters", href: "/dashboard/semester", icon: IconCalendarEvent },
+        {label:"Teachers", href:"/dashboard/teachers", icon:IconBuildingCommunity},
+        {label:"Subjects", href:"/dashboard/subjects", icon:IconBuildingCommunity},
     ];
 
     return (
