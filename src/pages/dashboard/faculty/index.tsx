@@ -13,11 +13,12 @@ import {
     Stack,
     Paper,
     Badge,
+    ActionIcon,
 } from '@mantine/core';
 import { useForm, Controller } from 'react-hook-form';
-import { IconPlus, IconBuilding, IconToggleLeft, IconToggleRight } from '@tabler/icons-react';
+import { IconPlus, IconBuilding, IconToggleLeft, IconToggleRight, IconEdit } from '@tabler/icons-react';
 import {AdminDashboardLayout} from "@/layouts/AdminDashboardLayout";
-import {GetRequest, PostRequest} from "@/plugins/https";
+import {GetRequest, PostRequest, PatchRequest} from "@/plugins/https";
 
 const theme = createTheme({
     primaryColor: 'indigo',
@@ -40,8 +41,10 @@ type FacultyFormData = {
 export default function FacultyPage() {
     const [faculties, setFaculties] = useState<any[]>([]);
     const [addOpened, setAddOpened] = useState(false);
+    const [editOpened, setEditOpened] = useState(false);
+    const [editingFaculty, setEditingFaculty] = useState<Faculty | null>(null);
 
-    const { control, handleSubmit, reset } = useForm<FacultyFormData>({
+    const { control, handleSubmit, reset, setValue } = useForm<FacultyFormData>({
         defaultValues: {
             name: '',
             isActive: true,
@@ -60,6 +63,26 @@ export default function FacultyPage() {
        {
            console.log(e);
        }
+    };
+    
+    const onEditSubmit = async (data: FacultyFormData) => {
+        if (!editingFaculty) return;
+        try {
+            await PatchRequest(`/faculty/${editingFaculty.id}`, data);
+            setEditOpened(false);
+            setEditingFaculty(null);
+            reset();
+            await getFaculties();
+        } catch (e) {
+            console.log(e);
+        }
+    };
+
+    const openEditModal = (faculty: Faculty) => {
+        setEditingFaculty(faculty);
+        setValue('name', faculty.name);
+        setValue('isActive', faculty.isActive);
+        setEditOpened(true);
     };
 
     const getFaculties = async () => {
@@ -96,6 +119,11 @@ export default function FacultyPage() {
                     {faculty.isActive ? 'Active' : 'Inactive'}
                 </Badge>
             </Table.Td>
+            <Table.Td>
+                <ActionIcon variant="light" color="blue" onClick={() => openEditModal(faculty)}>
+                    <IconEdit size={18} />
+                </ActionIcon>
+            </Table.Td>
         </Table.Tr>
     ));
 
@@ -106,7 +134,10 @@ export default function FacultyPage() {
                     <Title order={1}>Faculties</Title>
                     <Button
                         leftSection={<IconPlus size={18} />}
-                        onClick={() => setAddOpened(true)}
+                        onClick={() => {
+                            reset({ name: '', isActive: true });
+                            setAddOpened(true);
+                        }}
                         color="cyan"
                     >
                         Add New Faculty
@@ -120,6 +151,7 @@ export default function FacultyPage() {
                             <Table.Tr>
                                 <Table.Th>Faculty Name</Table.Th>
                                 <Table.Th>Status</Table.Th>
+                                <Table.Th>Actions</Table.Th>
                             </Table.Tr>
                         </Table.Thead>
                         <Table.Tbody>{rows}</Table.Tbody>
@@ -174,6 +206,68 @@ export default function FacultyPage() {
                                 </Button>
                                 <Button type="submit" color="cyan">
                                     Add Faculty
+                                </Button>
+                            </Group>
+                        </Stack>
+                    </form>
+                </Modal>
+                
+                {/* Edit Modal */}
+                <Modal
+                    opened={editOpened}
+                    onClose={() => {
+                        setEditOpened(false);
+                        setEditingFaculty(null);
+                        reset();
+                    }}
+                    title={<Title order={3}>Edit Faculty</Title>}
+                    centered
+                >
+                    <form onSubmit={handleSubmit(onEditSubmit)}>
+                        <Stack gap="md">
+                            <Controller
+                                name="name"
+                                control={control}
+                                render={({ field }) => (
+                                    <TextInput
+                                        label="Faculty Name"
+                                        placeholder="e.g., Faculty of Law"
+                                        leftSection={<IconBuilding size={16} />}
+                                        {...field}
+                                    />
+                                )}
+                            />
+
+                            <Controller
+                                name="isActive"
+                                control={control}
+                                render={({ field }) => (
+                                    <Switch
+                                        label="Is Active"
+                                        description="Set whether this faculty is currently active"
+                                        checked={field.value}
+                                        onChange={(event) => field.onChange(event.currentTarget.checked)}
+                                        thumbIcon={
+                                            field.value ? (
+                                                <IconToggleRight size={12} />
+                                            ) : (
+                                                <IconToggleLeft size={12} />
+                                            )
+                                        }
+                                    />
+                                )}
+                            />
+
+                            <Group justify="flex-end" mt="lg">
+                                <Button variant="light" color="gray" onClick={() => {
+                                    setEditOpened(false);
+                                    setEditingFaculty(null);
+                                    reset();
+                                }}>
+                                    Cancel
+                                </Button>
+                                <Button type="submit" color="blue">
+                                    Save Changes
                                 </Button>
                             </Group>
                         </Stack>

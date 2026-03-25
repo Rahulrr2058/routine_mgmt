@@ -190,19 +190,21 @@ export default function SemestersPage() {
 
     const rows = semesters.map((sem:any) => (
         <Table.Tr key={sem.id}>
+            <Table.Td>{sem?.batch?.faculty?.name}</Table.Td>
             <Table.Td>
                 <Group gap="sm">
                     <IconCalendarEvent size={18} />
                     {sem.name}
                 </Group>
             </Table.Td>
+            <Table.Td>{sem?.batch.name}</Table.Td>
+            <Table.Td>{sem?.batch.year}</Table.Td>
+
             <Table.Td>
                 <Badge color={sem.isActive ? 'green' : 'gray'} variant="light">
                     {sem.isActive ? 'Active' : 'Inactive'}
                 </Badge>
             </Table.Td>
-            <Table.Td>{sem?.batch.name}</Table.Td>
-            <Table.Td>{sem?.batch.year}</Table.Td>
             <Table.Td>
                 {sem.isCurrent ? (
                     <Badge color="teal" leftSection={<IconSchool size={14} />}>
@@ -238,13 +240,13 @@ export default function SemestersPage() {
                         >
                             Add Single Semester
                         </Button>
-                        <Button
-                            leftSection={<IconCopyPlus size={18} />}
-                            onClick={() => setBulkOpened(true)}
-                            color="orange"
-                        >
-                            Bulk Create Semesters
-                        </Button>
+                        {/*<Button*/}
+                        {/*    leftSection={<IconCopyPlus size={18} />}*/}
+                        {/*    onClick={() => setBulkOpened(true)}*/}
+                        {/*    color="orange"*/}
+                        {/*>*/}
+                        {/*    Bulk Create Semesters*/}
+                        {/*</Button>*/}
                     </Group>
                 </Group>
 
@@ -259,10 +261,11 @@ export default function SemestersPage() {
                     <Table highlightOnHover>
                         <Table.Thead>
                             <Table.Tr>
+                                <Table.Th>Faculty</Table.Th>
                                 <Table.Th>Semester Name</Table.Th>
-                                <Table.Th>Status</Table.Th>
                                 <Table.Th>Batch</Table.Th>
                                 <Table.Th>Batch Year</Table.Th>
+                                <Table.Th>Status</Table.Th>
                                 <Table.Th>Current</Table.Th>
                                 <Table.Th>Actions</Table.Th>
                             </Table.Tr>

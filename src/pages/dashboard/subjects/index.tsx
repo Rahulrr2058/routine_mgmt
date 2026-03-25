@@ -38,12 +38,29 @@ interface Teacher {
     isActive: boolean;
 }
 
+interface Batch {
+    id: string;
+    name: string;
+    facultyId: string;
+    faculty: Faculty;
+    year: string | number;
+}
+
+interface Semester {
+    id: string;
+    name: string;
+    batchId: string;
+    batch: Batch;
+}
+
 interface Subject {
     id: string;
     name: string;
     code: string;
     isActive: boolean | null;
     faculty: Faculty;
+    batch?: Batch;
+    semester?: Semester;
     teacher: Teacher[];   // note: backend returns "teacher" (singular), but array
 }
 
@@ -51,6 +68,8 @@ type SubjectFormData = {
     name: string;
     code: string;
     facultyId: string;
+    batchId?: string;
+    semesterId?: string;
     teacherIds: string[];
     isActive: boolean;
 };
@@ -58,21 +77,28 @@ type SubjectFormData = {
 export default function SubjectsPage() {
     const [subjects, setSubjects] = useState<Subject[]>([]);
     const [faculties, setFaculties] = useState<Faculty[]>([]);
+    const [batches, setBatches] = useState<Batch[]>([]);
+    const [semesters, setSemesters] = useState<Semester[]>([]);
     const [teachers, setTeachers] = useState<Teacher[]>([]);
     const [modalOpened, setModalOpened] = useState(false);
     const [isEditMode, setIsEditMode] = useState(false);
     const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
 
-    const { control, handleSubmit, reset, setValue, formState: { errors } } = useForm<SubjectFormData>({
+    const { control, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm<SubjectFormData>({
         defaultValues: {
             name: '',
             code: '',
             facultyId: '',
+            batchId: '',
+            semesterId: '',
             teacherIds: [],
             isActive: true,
         },
     });
+
+    const selectedFacultyId = watch('facultyId');
+    const selectedBatchId = watch('batchId');
 
     // Fetch all subjects
     const getSubjects = async () => {
@@ -91,6 +117,26 @@ export default function SubjectsPage() {
             setFaculties(res.data || []);
         } catch (e) {
             console.error("Failed to load faculties:", e);
+        }
+    };
+
+    // Fetch batches
+    const getBatches = async () => {
+        try {
+            const res = await GetRequest("/batch");
+            setBatches(res.data || []);
+        } catch (e) {
+            console.error("Failed to load batches:", e);
+        }
+    };
+
+    // Fetch semesters
+    const getSemesters = async () => {
+        try {
+            const res = await GetRequest("/semester");
+            setSemesters(res.data || []);
+        } catch (e) {
+            console.error("Failed to load semesters:", e);
         }
     };
 
@@ -113,6 +159,8 @@ export default function SubjectsPage() {
             setValue("name", subj.name);
             setValue("code", subj.code);
             setValue("facultyId", subj.faculty?.id || '');
+            setValue("batchId", subj.batch?.id || '');
+            setValue("semesterId", subj.semester?.id || '');
             setValue("teacherIds", subj.teacher?.map((t: Teacher) => t.id) || []);
             setValue("isActive", subj.isActive ?? true);
         } catch (e) {
@@ -123,8 +171,16 @@ export default function SubjectsPage() {
     useEffect(() => {
         getSubjects();
         getFaculties();
+        getBatches();
+        getSemesters();
         getTeachers();
     }, []);
+
+    // Filter batches based on selected faculty
+    const filteredBatches = batches.filter(b => b.faculty?.id === selectedFacultyId || b.facultyId === selectedFacultyId);
+    
+    // Filter semesters based on selected batch
+    const filteredSemesters = semesters.filter(s => s.batch?.id === selectedBatchId || s.batchId === selectedBatchId);
 
     // Open modal for ADD
     const openAddModal = () => {
@@ -134,6 +190,8 @@ export default function SubjectsPage() {
             name: '',
             code: '',
             facultyId: '',
+            batchId: '',
+            semesterId: '',
             teacherIds: [],
             isActive: true,
         });
@@ -155,7 +213,9 @@ export default function SubjectsPage() {
                 name: data.name,
                 code: data.code,
                 facultyId: data.facultyId,
-                teacherIds: data.teacherIds,
+                batchId: data.batchId || undefined,
+                semesterId: data.semesterId || undefined,
+                teacherIds: data.teacherIds.length > 0 ? data.teacherIds : undefined,
                 isActive: data.isActive,
             };
 
@@ -177,6 +237,7 @@ export default function SubjectsPage() {
 
     const rows = subjects.map((subject) => (
         <Table.Tr key={subject.id}>
+            <Table.Td>{subject.faculty?.name || '—'}</Table.Td> 
             <Table.Td>
                 <Group gap="sm">
                     <IconBook size={18} />
@@ -184,6 +245,12 @@ export default function SubjectsPage() {
                 </Group>
             </Table.Td>
             <Table.Td>{subject.code}</Table.Td>
+            <Table.Td>
+                {subject.batch ? `${subject.batch.name} (${subject.batch.year})` : '—'}
+            </Table.Td>
+            <Table.Td>
+                {subject.semester?.name || '—'}
+            </Table.Td>
             <Table.Td>
                 <Badge
                     color={subject.isActive ? 'green' : 'red'}
@@ -193,7 +260,7 @@ export default function SubjectsPage() {
                     {subject.isActive ? 'Active' : 'Inactive'}
                 </Badge>
             </Table.Td>
-            <Table.Td>{subject.faculty?.name || '—'}</Table.Td>
+
             <Table.Td>
                 {subject.teacher?.length > 0
                     ? subject.teacher.map(t => t.name).join(', ')
@@ -212,6 +279,8 @@ export default function SubjectsPage() {
     ));
 
     const facultyOptions = faculties.map(f => ({ value: f.id, label: f.name }));
+    const batchOptions = filteredBatches.map(b => ({ value: b.id, label: `${b.name} - ${b.year}` }));
+    const semesterOptions = filteredSemesters.map(s => ({ value: s.id, label: s.name }));
     const teacherOptions = teachers.map(t => ({ value: t.id, label: t.name }));
 
     return (
@@ -232,10 +301,12 @@ export default function SubjectsPage() {
                     <Table highlightOnHover verticalSpacing="md">
                         <Table.Thead>
                             <Table.Tr>
+                                <Table.Th>Faculty</Table.Th>
                                 <Table.Th>Subject Name</Table.Th>
                                 <Table.Th>Code</Table.Th>
+                                <Table.Th>Batch</Table.Th>
+                                <Table.Th>Semester</Table.Th>
                                 <Table.Th>Status</Table.Th>
-                                <Table.Th>Faculty</Table.Th>
                                 <Table.Th>Teachers</Table.Th>
                                 <Table.Th style={{ width: 80 }}>Actions</Table.Th>
                             </Table.Tr>
@@ -243,7 +314,7 @@ export default function SubjectsPage() {
                         <Table.Tbody>
                             {subjects.length === 0 ? (
                                 <Table.Tr>
-                                    <Table.Td colSpan={6} ta="center" c="dimmed">
+                                    <Table.Td colSpan={8} ta="center" c="dimmed">
                                         No subjects found
                                     </Table.Td>
                                 </Table.Tr>
@@ -315,6 +386,47 @@ export default function SubjectsPage() {
                                         searchable
                                         error={errors.facultyId?.message}
                                         {...field}
+                                        onChange={(val) => {
+                                            field.onChange(val);
+                                            // Reset batch and semester when faculty changes
+                                            setValue('batchId', '');
+                                            setValue('semesterId', '');
+                                        }}
+                                    />
+                                )}
+                            />
+                            
+                            <Controller
+                                name="batchId"
+                                control={control}
+                                render={({ field }) => (
+                                    <Select
+                                        label="Batch (Optional)"
+                                        placeholder="Select batch"
+                                        data={batchOptions}
+                                        searchable
+                                        disabled={!selectedFacultyId || batchOptions.length === 0}
+                                        {...field}
+                                        onChange={(val) => {
+                                            field.onChange(val);
+                                            // Reset semester when batch changes
+                                            setValue('semesterId', '');
+                                        }}
+                                    />
+                                )}
+                            />
+                            
+                            <Controller
+                                name="semesterId"
+                                control={control}
+                                render={({ field }) => (
+                                    <Select
+                                        label="Semester (Optional)"
+                                        placeholder="Select semester"
+                                        data={semesterOptions}
+                                        searchable
+                                        disabled={!selectedBatchId || semesterOptions.length === 0}
+                                        {...field}
                                     />
                                 )}
                             />
@@ -324,7 +436,7 @@ export default function SubjectsPage() {
                                 control={control}
                                 render={({ field }) => (
                                     <MultiSelect
-                                        label="Assigned Teachers"
+                                        label="Assigned Teachers (Optional)"
                                         placeholder="Select one or more teachers"
                                         data={teacherOptions}
                                         searchable

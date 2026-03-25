@@ -39,7 +39,7 @@ interface Faculty {
 }
 
 type BatchFormData = {
-    name?: string;          // optional if backend generates it
+    name: string;          // optional if backend generates it
     year: number;
     facultyId: string;
 };
@@ -63,6 +63,7 @@ export default function BatchesPage() {
             const formattedData = {
                 year: data.year,
                 facultyId: data.facultyId,
+                name:data.name,
                 // name: data.name, // include only if your backend expects it
             };
             await PostRequest("/batch", formattedData);
@@ -165,11 +166,22 @@ export default function BatchesPage() {
                                 control={control}
                                 rules={{ required: true }}
                                 render={({ field }) => (
-                                    <NumberInput
+                                    <TextInput
                                         label="Year"
                                         placeholder="2026"
-                                        min={1900}
-                                        max={2100}
+                                        {...field}
+                                        onChange={(value) => field.onChange(value ?? 0)}
+                                    />
+                                )}
+                            />
+                            <Controller
+                                name="name"
+                                control={control}
+                                rules={{ required: true }}
+                                render={({ field }) => (
+                                    <TextInput
+                                        label="name"
+                                        placeholder="2026"
                                         {...field}
                                         onChange={(value) => field.onChange(value ?? 0)}
                                     />

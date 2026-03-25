@@ -192,10 +192,8 @@ export default function ClassSectionsPage() {
     const rows = sections.map((section:any) => (
         <Table.Tr key={section.id}>
             <Table.Td>
-                <Group gap="sm">
-                    <IconSection size={18} />
-                    {section.name}
-                </Group>
+                {section.semester?.batch?.faculty ? section.semester.batch.faculty.name : '-'}
+
             </Table.Td>
             <Table.Td>
                 {section.semester ? (
@@ -208,15 +206,20 @@ export default function ClassSectionsPage() {
                 )}
             </Table.Td>
             <Table.Td>
+                <Group gap="sm">
+                    <IconSection size={18} />
+                    {section.name}
+                </Group>
+            </Table.Td>
+
+
+            <Table.Td>
                 {section.semester?.batch ? section.semester.batch.name : '-'}
             </Table.Td>
             <Table.Td>
                 {section.semester?.batch ? section.semester.batch.year : '-'}
             </Table.Td>
-            <Table.Td>
-                {section.semester?.batch?.faculty ? section.semester.batch.faculty.name : '-'}
 
-            </Table.Td>
             <Table.Td>
                 <ActionIcon
                     variant="subtle"
@@ -243,13 +246,13 @@ export default function ClassSectionsPage() {
                         >
                             Add Single Section
                         </Button>
-                        <Button
-                            leftSection={<IconCopyPlus size={18} />}
-                            onClick={() => setBulkOpened(true)}
-                            color="teal"
-                        >
-                            Bulk Create Sections
-                        </Button>
+                        {/*<Button*/}
+                        {/*    leftSection={<IconCopyPlus size={18} />}*/}
+                        {/*    onClick={() => setBulkOpened(true)}*/}
+                        {/*    color="teal"*/}
+                        {/*>*/}
+                        {/*    Bulk Create Sections*/}
+                        {/*</Button>*/}
                     </Group>
                 </Group>
 
@@ -266,11 +269,11 @@ export default function ClassSectionsPage() {
                     <Table highlightOnHover>
                         <Table.Thead>
                             <Table.Tr>
-                                <Table.Th>Section Name</Table.Th>
+                                <Table.Th>Faculty</Table.Th>
                                 <Table.Th>Semester</Table.Th>
+                                <Table.Th>Section Name</Table.Th>
                                 <Table.Th>Batch</Table.Th>
                                 <Table.Th>Year</Table.Th>
-                                <Table.Th>Faculty</Table.Th>
                                 <Table.Th>Actions</Table.Th>
                             </Table.Tr>
                         </Table.Thead>
