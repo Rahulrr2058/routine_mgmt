@@ -369,7 +369,7 @@ export default function ClassRoutinePage() {
                     </Group>
 
                     <Button leftSection={<IconPlus size={18} />} color="teal" onClick={openAddModal}>
-                        Add Slot
+                        Add Routine
                     </Button>
                 </Group>
 

@@ -140,7 +140,7 @@ export default function BatchesPage() {
                     <Table highlightOnHover>
                         <Table.Thead>
                             <Table.Tr>
-                                <Table.Th>Name</Table.Th>
+                                <Table.Th>Batch Name</Table.Th>
                                 <Table.Th>Year</Table.Th>
                                 <Table.Th>Faculty </Table.Th>
                             </Table.Tr>
