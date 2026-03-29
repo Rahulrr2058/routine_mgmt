@@ -358,10 +358,10 @@ export default function SubjectsPage() {
                                 control={control}
                                 rules={{
                                     required: "Code is required",
-                                    pattern: {
-                                        value: /^[A-Z0-9-]+$/,
-                                        message: "Only uppercase, numbers, hyphen allowed",
-                                    },
+                                    // pattern: {
+                                    //     value: /^[A-Z0-9-]+$/,
+                                    //     message: "Only uppercase, numbers, hyphen allowed",
+                                    // },
                                 }}
                                 render={({ field }) => (
                                     <TextInput

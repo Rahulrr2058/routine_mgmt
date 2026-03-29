@@ -105,13 +105,12 @@ export default function BatchesPage() {
 
     const rows = batches.map((batch:any) => (
         <Table.Tr key={batch.id}>
+            <Table.Td>
+                    {batch.faculty.name}
+
+            </Table.Td>
             <Table.Td>{batch.name}</Table.Td>
             <Table.Td>{batch.year}</Table.Td>
-            <Table.Td>
-                <code className="text-xs bg-gray-100 px-2 py-1 rounded font-mono">
-                    {batch.faculty.name}
-                </code>
-            </Table.Td>
         </Table.Tr>
     ));
 
@@ -140,9 +139,9 @@ export default function BatchesPage() {
                     <Table highlightOnHover>
                         <Table.Thead>
                             <Table.Tr>
+                                <Table.Th>Faculty Name</Table.Th>
                                 <Table.Th>Batch Name</Table.Th>
                                 <Table.Th>Year</Table.Th>
-                                <Table.Th>Faculty </Table.Th>
                             </Table.Tr>
                         </Table.Thead>
                         <Table.Tbody>{rows}</Table.Tbody>
@@ -168,7 +167,7 @@ export default function BatchesPage() {
                                 render={({ field }) => (
                                     <TextInput
                                         label="Year"
-                                        placeholder="2026"
+                                        placeholder="2026-2025"
                                         {...field}
                                         onChange={(value) => field.onChange(value ?? 0)}
                                     />
@@ -180,8 +179,8 @@ export default function BatchesPage() {
                                 rules={{ required: true }}
                                 render={({ field }) => (
                                     <TextInput
-                                        label="name"
-                                        placeholder="2026"
+                                        label="Batch Name"
+                                        placeholder="1st Batch"
                                         {...field}
                                         onChange={(value) => field.onChange(value ?? 0)}
                                     />

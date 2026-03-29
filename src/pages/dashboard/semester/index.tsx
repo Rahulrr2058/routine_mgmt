@@ -49,6 +49,10 @@ interface Batch {
     id: string;
     name: string;
     year: string | number;
+    faculty: {
+        id: string;
+        name: string;
+    }
     isActive: boolean;
 }
 
@@ -185,10 +189,10 @@ export default function SemestersPage() {
     // Prepare Select options: show name + year
     const batchOptions = batches.map((batch) => ({
         value: batch.id,
-        label: `${batch.name} - ${batch.year}`,
+        label: `${batch.name} - ${batch.year} - ${batch.faculty.name}`,
     }));
 
-    const rows = semesters.map((sem:any) => (
+    const rows = semesters.map((sem: any) => (
         <Table.Tr key={sem.id}>
             <Table.Td>{sem?.batch?.faculty?.name}</Table.Td>
             <Table.Td>

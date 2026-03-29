@@ -21,6 +21,7 @@ import {
     Select,
     TextInput,
     NumberInput,
+    Switch,
 } from '@mantine/core';
 import { useForm, Controller } from 'react-hook-form';
 import { IconPlus, IconArrowLeft, IconChevronRight } from '@tabler/icons-react';
@@ -45,9 +46,10 @@ interface Routine {
     index: number;
     startTime: string;
     endTime: string;
+    isBreak?: boolean;
     roomNo?: string;
-    teacher: { id: string; name: string; isActive: boolean };
-    subject: { id: string; name: string; code: string; isActive: boolean };
+    teacher?: { id: string; name: string; isActive: boolean };
+    subject?: { id: string; name: string; code: string; isActive: boolean };
     classSection: { id: string; name: string; semester?: Semester };
 }
 
@@ -56,6 +58,7 @@ type FormData = {
     index: number;
     startTime: string;
     endTime: string;
+    isBreak: boolean;
     teacher: string;       // teacher id
     subject: string;       // subject name
     subjectCode: string;
@@ -87,6 +90,7 @@ export default function ClassRoutinePage() {
             index: 1,
             startTime: '',
             endTime: '',
+            isBreak: false,
             teacher: '',
             subject: '',
             subjectCode: '',
@@ -95,6 +99,7 @@ export default function ClassRoutinePage() {
     });
 
     const watchedTeacher = form.watch('teacher');
+    const watchedIsBreak = form.watch('isBreak');
 
     // ─── Fetch initial data ────────────────────────────────────────
     useEffect(() => {
@@ -195,9 +200,10 @@ export default function ClassRoutinePage() {
             index: routine.index,
             startTime: routine.startTime,
             endTime: routine.endTime,
-            teacher: routine.teacher.id,
-            subject: routine.subject.name,
-            subjectCode: routine.subject.code,
+            isBreak: routine.isBreak || false,
+            teacher: routine.teacher?.id || '',
+            subject: routine.subject?.id || '',
+            subjectCode: routine.subject?.code || '',
             roomNo: routine.roomNo || '',
         });
         setEditingRoutine(routine);
@@ -213,22 +219,24 @@ export default function ClassRoutinePage() {
                     index: values.index,
                     startTime: values.startTime,
                     endTime: values.endTime,
+                    isBreak: values.isBreak,
                     roomNo: values.roomNo?.trim() || undefined,
-                    teacher: values.teacher,
-                    subject: values.subject,
+                    teacher: values.isBreak ? undefined : values.teacher,
+                    subject: values.isBreak ? undefined : values.subject,
                 };
                 await PatchRequest(`/class-routine/${editingRoutine.id}`, payload);
             } else {
                 // POST
                 const payload = {
                     classSectionId: selectedSection?.id,
-                    teacher: values.teacher,
-                    subject: values.subject,
+                    teacher: values.isBreak ? undefined : values.teacher,
+                    subject: values.isBreak ? undefined : values.subject,
                     classes: [{
                         day: values.day,
                         index: values.index,
                         startTime: values.startTime,
                         endTime: values.endTime,
+                        isBreak: values.isBreak,
                         roomNo: values.roomNo?.trim() || undefined,
                     }],
                 };
@@ -426,12 +434,22 @@ export default function ClassRoutinePage() {
                                                     onClick={() => entry && openEditModal(entry)}
                                                 >
                                                     {entry ? (
+                                                    entry.isBreak ? (
+                                                        <Stack gap={4} align="center">
+                                                            <Badge color="orange" variant="light" radius="sm">Break</Badge>
+                                                            {entry.roomNo && (
+                                                                <Badge size="xs" color="violet" variant="light" radius="sm">
+                                                                    {entry.roomNo}
+                                                                </Badge>
+                                                            )}
+                                                        </Stack>
+                                                    ) : (
                                                         <Stack gap={4} align="center">
                                                             <Text fw={600} size="sm" lh={1.2}>
-                                                                {entry.subject.name}
+                                                                {entry.subject?.name}
                                                             </Text>
                                                             <Text size="xs" c="gray.7" fw={500}>
-                                                                {entry.teacher.name}
+                                                                {entry.teacher?.name}
                                                             </Text>
                                                             {entry.roomNo && (
                                                                 <Badge size="xs" color="violet" variant="light" radius="sm">
@@ -439,6 +457,7 @@ export default function ClassRoutinePage() {
                                                                 </Badge>
                                                             )}
                                                         </Stack>
+                                                    )
                                                     ) : (
                                                         <Text size="xs" c="gray.5" fs="italic">—</Text>
                                                     )}
@@ -502,36 +521,52 @@ export default function ClassRoutinePage() {
                                 <NumberInput label="Period Index" min={1} {...field} />
                             )} />
 
-                            <Controller
-                                name="teacher"
-                                control={form.control}
-                                rules={{ required: "Required" }}
-                                render={({ field }) => (
-                                    <Select
-                                        label="Teacher"
-                                        data={teachers.map(t => ({ value: t.id, label: t.name }))}
-                                        searchable
-                                        {...field}
-                                    />
-                                )}
-                            />
+                        <Controller
+                            name="isBreak"
+                            control={form.control}
+                            render={({ field }) => (
+                                <Switch
+                                    label="Is this a break period?"
+                                    checked={field.value}
+                                    onChange={(e) => field.onChange(e.currentTarget.checked)}
+                                />
+                            )}
+                        />
 
-                            <Controller
-                                name="subject"
-                                control={form.control}
-                                rules={{ required: "Required" }}
-                                render={({ field }) => (
-                                    <Select
-                                        label="Subject"
-                                        data={teacherSubjects.map(s => ({ value: s.id, label: `${s.name} (${s.code})` }))}
-                                        disabled={!watchedTeacher}
-                                        searchable
-                                        {...field}
-                                    />
-                                )}
-                            />
+                        {!watchedIsBreak && (
+                            <>
+                                <Controller
+                                    name="teacher"
+                                    control={form.control}
+                                    rules={{ required: "Required" }}
+                                    render={({ field }) => (
+                                        <Select
+                                            label="Teacher"
+                                            data={teachers.map(t => ({ value: t.id, label: t.name }))}
+                                            searchable
+                                            {...field}
+                                        />
+                                    )}
+                                />
 
-                            <TextInput label="Subject Code" value={form.watch('subjectCode')} disabled readOnly />
+                                <Controller
+                                    name="subject"
+                                    control={form.control}
+                                    rules={{ required: "Required" }}
+                                    render={({ field }) => (
+                                        <Select
+                                            label="Subject"
+                                            data={teacherSubjects.map(s => ({ value: s.id, label: `${s.name} (${s.code})` }))}
+                                            disabled={!watchedTeacher}
+                                            searchable
+                                            {...field}
+                                        />
+                                    )}
+                                />
+
+                                <TextInput label="Subject Code" value={form.watch('subjectCode')} disabled readOnly />
+                            </>
+                        )}
 
                             <TextInput label="Room No" {...form.register('roomNo')} />
 

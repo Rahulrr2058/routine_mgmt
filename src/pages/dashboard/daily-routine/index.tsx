@@ -12,7 +12,7 @@ import {
     Text,
     Table,
     Loader,
-    Switch,
+    Radio,
     Alert,
     Select,
     Grid,
@@ -32,13 +32,14 @@ interface Section { id: string; name: string; semester?: Semester; }
 interface DailyClass {
     id: string;
     classDate: string;
-    hasAttended: boolean;
+    hasAttended: boolean | null;
     classRoutine: {
         id: string;
         day: string;
         index: number;
         startTime: string;
         endTime: string;
+        isBreak?: boolean;
         roomNo?: string;
         teacher?: { id: string; name: string; isActive: boolean };
         subject?: { id: string; name: string; code: string; isActive: boolean };
@@ -110,17 +111,17 @@ export default function DailyClassPage() {
         fetchTodaysClasses();
     }, []);
 
-    const toggleAttendance = async (dailyClass: DailyClass) => {
+    const updateAttendance = async (dailyClass: DailyClass, status: boolean) => {
         try {
             setUpdatingId(dailyClass.id);
             await PatchRequest(`/daily-class/${dailyClass.id}`, {
-                hasAttended: !dailyClass.hasAttended,
+                hasAttended: status,
             });
 
             setDailyClasses(prev =>
                 prev.map(dc =>
                     dc.id === dailyClass.id
-                        ? { ...dc, hasAttended: !dc.hasAttended }
+                        ? { ...dc, hasAttended: status }
                         : dc
                 )
             );
@@ -389,46 +390,63 @@ export default function DailyClassPage() {
 
                                                     {uniqueIndices.map(idx => {
                                                         const dc = group.classes.find(c => c.classRoutine.index === idx);
+                                                        const isBreak = dc?.classRoutine?.isBreak;
+                                                        const cellBg = dc?.hasAttended === true ? 'var(--mantine-color-teal-0)' : dc?.hasAttended === false ? 'var(--mantine-color-red-0)' : undefined;
+
                                                         return (
                                                             <Table.Td
                                                                 key={idx}
                                                                 ta="center"
-                                                                style={{ padding: '12px 8px' }}
+                                                                style={{ 
+                                                                    padding: '12px 8px', 
+                                                                    backgroundColor: isBreak ? undefined : cellBg,
+                                                                    transition: 'background-color 0.3s ease'
+                                                                }}
                                                             >
                                                                 {dc ? (
-                                                                    <Stack gap={6} align="center">
-                                                                        <Text fw={600} size="sm" lh={1.2}>
-                                                                            {dc.classRoutine.subject?.name || 'Unknown Subject'}
-                                                                        </Text>
-                                                                        <Text size="xs" c="gray.7" fw={500}>
-                                                                            {dc.classRoutine.teacher?.name || 'Unknown Teacher'}
-                                                                        </Text>
-                                                                        {dc.classRoutine.roomNo && (
-                                                                            <Badge size="xs" color="violet" variant="light" radius="sm">
-                                                                                {dc.classRoutine.roomNo}
-                                                                            </Badge>
-                                                                        )}
-                                                                        
-                                                                        <Group gap={6} mt={4}>
-                                                                            <Switch
-                                                                                checked={dc.hasAttended}
-                                                                                onChange={() => toggleAttendance(dc)}
-                                                                                disabled={updatingId === dc.id}
-                                                                                color="teal"
-                                                                                size="sm"
-                                                                                thumbIcon={
-                                                                                    dc.hasAttended ? (
-                                                                                        <IconCheck size={10} />
-                                                                                    ) : (
-                                                                                        <IconX size={10} />
-                                                                                    )
-                                                                                }
-                                                                            />
-                                                                            <Text size="xs" fw={500} c={dc.hasAttended ? "teal" : "dimmed"}>
-                                                                                {dc.hasAttended ? "Attended" : "Not Attended"}
+                                                                    isBreak ? (
+                                                                        <Stack gap={4} align="center">
+                                                                            <Badge color="orange" variant="light" radius="sm">Break</Badge>
+                                                                            {dc.classRoutine.roomNo && (
+                                                                                <Badge size="xs" color="violet" variant="light" radius="sm">
+                                                                                    {dc.classRoutine.roomNo}
+                                                                                </Badge>
+                                                                            )}
+                                                                        </Stack>
+                                                                    ) : (
+                                                                        <Stack gap={6} align="center">
+                                                                            <Text fw={600} size="sm" lh={1.2}>
+                                                                                {dc.classRoutine.subject?.name || 'Unknown Subject'}
                                                                             </Text>
-                                                                        </Group>
-                                                                    </Stack>
+                                                                            <Text size="xs" c="gray.7" fw={500}>
+                                                                                {dc.classRoutine.teacher?.name || 'Unknown Teacher'}
+                                                                            </Text>
+                                                                            {dc.classRoutine.roomNo && (
+                                                                                <Badge size="xs" color="violet" variant="light" radius="sm">
+                                                                                    {dc.classRoutine.roomNo}
+                                                                                </Badge>
+                                                                            )}
+                                                                            
+                                                                            <Group gap={10} mt={4} justify="center">
+                                                                                <Radio
+                                                                                    label="Present"
+                                                                                    color="teal"
+                                                                                    size="xs"
+                                                                                    checked={dc.hasAttended === true}
+                                                                                    onChange={() => updateAttendance(dc, true)}
+                                                                                    disabled={updatingId === dc.id}
+                                                                                />
+                                                                                <Radio
+                                                                                    label="On Leave"
+                                                                                    color="red"
+                                                                                    size="xs"
+                                                                                    checked={dc.hasAttended === false}
+                                                                                    onChange={() => updateAttendance(dc, false)}
+                                                                                    disabled={updatingId === dc.id}
+                                                                                />
+                                                                            </Group>
+                                                                        </Stack>
+                                                                    )
                                                                 ) : (
                                                                     <Text size="xs" c="gray.5" fs="italic">—</Text>
                                                                 )}
